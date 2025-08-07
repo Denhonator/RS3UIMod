@@ -5,6 +5,7 @@ using UnityEngine;
 using static MelonLoader.MelonLogger;
 using System.IO;
 using System;
+using System.Collections.Generic;
 
 //[HarmonyLib.HarmonyPatch(typeof(Il2CppMakimono.AnimationDirector), "GetCurrentState", new Type[] { typeof(int) })]
 //class PlayTime
@@ -84,7 +85,7 @@ public static class TrackGameStateChanges
         Application.targetFrameRate =
         state == GameCore.State.BATTLE ? Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
         state == GameCore.State.FIELD ? Settings.GetGameSpeedByIndex(Settings.instance.fieldSpeed) :
-                                        30;
+                                        60;
 
     public static void IncrementCurrentGameStateSpeed()
     {
@@ -154,6 +155,349 @@ public static class SpeedOptions
                 GameObject.Destroy(gui);
             }
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field), "Update")]
+public static class FPSFix
+{
+    public static bool Prefix()
+    {
+        RS3UI.frame += 1;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Character), "Update")]
+public static class FPSFix4
+{
+    public static void Prefix(Character __instance)
+    {
+        if (Character.m_speed_anime_step[0] == 8 && Application.targetFrameRate > 30)
+        {
+            for (int i = 0; i < Character.m_speed_anime_step.Length; i++)
+            {
+                Character.m_speed_anime_step[i] *= 2;
+            }
+        }
+        else if (Character.m_speed_anime_step[0] > 8 && Application.targetFrameRate == 30)
+        {
+            for (int i = 0; i < Character.m_speed_anime_step.Length; i++)
+            {
+                Character.m_speed_anime_step[i] /= 2;
+            }
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MenuObjectCharacter), "Update")]
+public static class FPSFix5
+{
+    public static bool Prefix(MenuManager __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field), "CharaUpdate")]
+public static class FPSFix3
+{
+    static int repeat = 0;
+
+    static bool btst(int a, int b)
+    {
+        return (a & b) != 0;
+    }
+    public static bool Prefix(ref Character ch, Field __instance)
+    {
+        if (DebugMenu.m_hide_npc && !ch.IsPlayer())
+        {
+            return false;
+        }
+        if (!ch.m_flag_ok)
+        {
+            return false;
+        }
+        int fpsmult = Application.targetFrameRate > 30 ? 2 : 1;
+        int num = ch.GetSpeedDot();
+        repeat = 0;
+
+        while (repeat >= 0)
+        {
+            int prevx = ch.m_x;
+
+            int attr = __instance.m_bg.GetAttr(ch.m_cell_x, ch.m_cell_y);
+            int m_jump_attr = HarmonyLib.Traverse.Create(__instance).Field("m_jump_attr").GetValue<int>();
+            if (ch.m_jump_cnt > 0 && m_jump_attr == 8192)
+            {
+                ch.m_dash = true;
+            }
+            if (ch.m_dash && (ch.m_x & 3) == 0 && (ch.m_y & 3) == 0)
+            {
+                num = 4;
+            }
+            if (ch.m_jump_cnt > 0 && m_jump_attr == 4096)
+            {
+                ch.m_dash = false;
+                num = 2;
+            }
+            if (ch.m_jump_cnt > 0 && m_jump_attr == 8192)
+            {
+                num = 4;
+            }
+            ch.m_flags &= -129;
+            if ((ch.m_bg_attr & 8388608) == 0)
+            {
+                if (ch.m_moving)
+                {
+                    if (btst(ch.m_bg_attr, 1048576) && num >= 2)
+                    {
+                        ch.m_flags |= 128;
+                        num /= 2;
+                        if (ch.m_dash && (ch.m_x & 1) == 0 && (ch.m_y & 1) == 0)
+                        {
+                            num = 2;
+                        }
+                    }
+                }
+                else if (btst(attr, 1048576) && num >= 2)
+                {
+                    ch.m_flags |= 128;
+                    num /= 2;
+                    if (ch.m_dash && (ch.m_x & 1) == 0 && (ch.m_y & 1) == 0)
+                    {
+                        num = 2;
+                    }
+                }
+            }
+            if (ch.m_ch != null)
+            {
+                if (btst(attr, 4194304) && ch.m_ofs_y == 0)
+                {
+                    if (btst(ch.m_flags, 4))
+                    {
+                        ch.m_water_draw = true;
+                        ch.m_ch.m_half_alpha = true;
+                    }
+                }
+                else
+                {
+                    ch.m_water_draw = false;
+                    ch.m_ch.m_half_alpha = false;
+                }
+            }
+            ch.m_force_dir = 0;
+            if (btst(attr, 52428800))
+            {
+                int num2 = attr & 52428800;
+                if (num2 != 2097152)
+                {
+                    if (num2 != 18874368)
+                    {
+                        if (num2 != 35651584)
+                        {
+                            if (num2 == 52428800)
+                            {
+                                ch.m_force_dir = 4;
+                            }
+                        }
+                        else
+                        {
+                            ch.m_force_dir = 3;
+                        }
+                    }
+                    else
+                    {
+                        ch.m_force_dir = 2;
+                    }
+                }
+                else
+                {
+                    ch.m_force_dir = 1;
+                }
+            }
+            if(repeat==0)
+                ch.Update();
+            if (ch.m_script_move)
+            {
+                return false;
+            }
+            short[] m_jump_kidou = HarmonyLib.Traverse.Create(__instance).Field("m_jump_kidou").GetValue<short[]>();
+            short[] m_jump_kidou2 = HarmonyLib.Traverse.Create(__instance).Field("m_jump_kidou2").GetValue<short[]>();
+            System.Reflection.MethodInfo dynMethod = __instance.GetType().GetMethod("test_hit_npc",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            if (ch.m_jump_cnt > 0 && (Time.frameCount % fpsmult)==0)
+            {
+                if (m_jump_attr == 8192)
+                {
+                    __instance.CharaMove(ch, ch.m_dir, true, false);
+                    ch.m_ofs_y = (int)m_jump_kidou[m_jump_kidou.Length - ch.m_jump_cnt];
+                    ch.m_jump_cnt--;
+                    if (ch.m_jump_cnt == 0)
+                    {
+                        ch.m_jump_cnt = -1;
+                        dynMethod.Invoke(__instance, new object[] { ch });
+                    }
+                }
+                if (m_jump_attr == 4096)
+                {
+                    __instance.CharaMove(ch, ch.m_dir, true, false);
+                    ch.m_ofs_y = (int)m_jump_kidou2[m_jump_kidou2.Length - ch.m_jump_cnt];
+                    ch.m_jump_cnt--;
+                    if (ch.m_jump_cnt == 0)
+                    {
+                        dynMethod.Invoke(__instance, new object[] { ch });
+                    }
+                }
+            }
+            int num3 = ch.m_cell_x * 8;
+            int num4 = ch.m_cell_y * 8;
+            if (btst(attr, 67108864) || ch.m_cmd_opt == 1)
+            {
+                if (ch.m_dash && (ch.m_x & 3) == 0)
+                {
+                    num = 4;
+                }
+
+                if (num >= 2)
+                    num /= fpsmult;
+                else if(fpsmult >= 2 && (Time.frameCount % fpsmult) != 0)
+                {
+                    return false;
+                }
+                if (fpsmult == 2 && num == 2 && repeat == 0 && ch.m_jump_cnt <= 0)
+                {
+                    repeat = 2;
+                    ch.m_time -= 1;
+                }
+
+                if (ch.m_x != num3)
+                {
+                    ch.m_moving = true;
+                    if (ch.m_x < num3)
+                    {
+                        ch.m_x += num;
+                    }
+                    else
+                    {
+                        ch.m_x -= num;
+                    }
+                    if (ch.m_y < num4)
+                    {
+                        ch.m_y += num / 2;
+                    }
+                    else
+                    {
+                        ch.m_y -= num / 2;
+                    }
+                }
+                else
+                {
+                    ch.m_moving = false;
+                }
+                if ((ch.m_dir == 0 || ch.m_dir == 1) && ch.m_y != num4)
+                {
+                    if (ch.m_y < num4)
+                    {
+                        ch.m_y += num;
+                    }
+                    else
+                    {
+                        ch.m_y -= num;
+                    }
+                }
+            }
+            else
+            {
+                if (num >= 2)
+                    num /= fpsmult;
+                else if(fpsmult >= 2 && (Time.frameCount % fpsmult) != 0)
+                {
+                    return false;
+                }
+                if (fpsmult == 2 && num == 2 && repeat == 0 && ch.m_jump_cnt <= 0)
+                {
+                    repeat = 2;
+                    ch.m_time -= 1;
+                }
+
+                if (ch.m_x != num3)
+                {
+                    ch.m_moving = true;
+                    if (ch.m_x < num3)
+                    {
+                        ch.m_x += num;
+                    }
+                    else
+                    {
+                        ch.m_x -= num;
+                    }
+                }
+                if (ch.m_y != num4)
+                {
+                    ch.m_moving = true;
+                    if (ch.m_y < num4)
+                    {
+                        ch.m_y += num;
+                    }
+                    else
+                    {
+                        ch.m_y -= num;
+                    }
+                }
+            }
+            bool flag = (ch.m_cmd_opt & 4) != 0;
+            if (flag)
+            {
+                if (ch.m_cmd_target_x == ch.m_cell_x && ch.m_cmd_target_y == ch.m_cell_y)
+                {
+                    ch.m_cmd_nmove = 0;
+                    ch.m_cmd_opt = 0;
+                }
+                else
+                {
+                    ch.m_cmd_nmove++;
+                }
+            }
+            if (ch.m_cmd_nmove > 0)
+            {
+                if (ch.m_x == num3 && (ch.m_y == num4 || ch.m_cmd_opt == 1))
+                {
+                    if (ch.m_x == num3 && ch.m_y == num4)
+                    {
+                        ch.m_cmd_nmove--;
+                    }
+                    ch.m_moving = false;
+                    int dir = ch.m_dir;
+                    __instance.CharaMove(ch, ch.m_cmd_dir, ch.m_cmd_force, false);
+                    if (ch.m_cmd_opt == 2)
+                    {
+                        ch.SetDir(dir);
+                    }
+                    ch.m_moving = true;
+                    if (ch.m_cmd_nmove == 0)
+                    {
+                        ch.m_cmd_dir = -1;
+                        ch.m_flags &= -17;
+                    }
+                }
+            }
+            else
+            {
+                ch.m_cmd_dir = -1;
+                if (ch.m_x == num3 && ch.m_cmd_opt == 1)
+                {
+                    ch.m_moving = false;
+                }
+            }
+            if (repeat == 1)
+                break;
+            repeat -= 1;
+        }
+        return false;
     }
 }
 
@@ -720,6 +1064,7 @@ namespace RS3
         public static string windowType = "";
         public static string touchType = "";
         public static int commandY = 83;
+        public static int frame = 0;
         public override void OnUpdate()
         {
             if(Input.GetKeyDown(KeyCode.F1))
