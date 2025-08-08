@@ -201,6 +201,103 @@ public static class FPSFix5
     }
 }
 
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
+public static class FPSFix2
+{
+    public static bool Prefix(BattleLogic.BattleScene __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+        {
+            return false;
+        }
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_result_anim")]
+public static class FPSFix6
+{
+    public static bool Prefix(BattleLogic.BattleScene __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+        {
+            return false;
+        }
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_appear_anim")]
+public static class FPSFix7
+{
+    public static bool Prefix(BattleLogic.BattleScene __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+        {
+            return false;
+        }
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
+public static class FPSFix8
+{
+    public static bool Prefix(BattleEffect __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+        {
+            //if (__instance._mess_queue.Count != 0)
+            //{
+            //    if (__instance._mess_queue.Peek().is_mess_end())
+            //    {
+            //        Utility_T_H.BattleMess battleMess = __instance._mess_queue.Dequeue();
+            //        battleMess.Release();
+            //    }
+            //    else
+            //    {
+            //        __instance._mess_queue.Peek().Draw();
+            //    }
+            //}
+            List<BattleAction> m_cmd_task = HarmonyLib.Traverse.Create(__instance).Field("m_cmd_task").GetValue<List<BattleAction>>();
+            List<Monster> m_monsters = HarmonyLib.Traverse.Create(__instance).Field("m_monsters").GetValue<List<Monster>>();
+            BattleEffect.DISP_PHASE m_disp_phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
+            if (m_cmd_task[__instance.m_act_cnt]._me.Count != 0 && m_disp_phase == BattleEffect.DISP_PHASE.SKILL_WINDOW)
+            {
+                BattleLogic.BattleUnitManager enemy_mng = GameCore.m_battle._enemy_mng;
+                if (m_cmd_task[__instance.m_act_cnt]._me[0] >= 10)
+                {
+                    if (!BattleWork.op_ev_btl_flag)
+                    {
+                        for (int k = 0; k < m_cmd_task[__instance.m_act_cnt]._me.Count; k++)
+                        {
+                            string acter_name = m_cmd_task[__instance.m_act_cnt]._acter_name;
+                            if (acter_name != null)
+                            {
+                                if (!(acter_name == string.Empty))
+                                {
+                                    int num9 = m_cmd_task[__instance.m_act_cnt]._me[k] - 10;
+                                    if (BattleWork.nezumi_event_flag)
+                                    {
+                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[18].x - 60, (int)__instance.m_position[18].y + 135, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
+                                    }
+                                    else
+                                    {
+                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].x, (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].y, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(Field), "CharaUpdate")]
 public static class FPSFix3
 {
@@ -1065,6 +1162,7 @@ namespace RS3
         public static string touchType = "";
         public static int commandY = 83;
         public static int frame = 0;
+        public static string replace = "";
         public override void OnUpdate()
         {
             if(Input.GetKeyDown(KeyCode.F1))
