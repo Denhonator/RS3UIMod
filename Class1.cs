@@ -1,11 +1,9 @@
 ﻿using RS3;
-using Harmony;
 using MelonLoader;
 using UnityEngine;
 using static MelonLoader.MelonLogger;
 using System.IO;
 using System;
-using System.Collections.Generic;
 
 //[HarmonyLib.HarmonyPatch(typeof(Il2CppMakimono.AnimationDirector), "GetCurrentState", new Type[] { typeof(int) })]
 //class PlayTime
@@ -25,7 +23,7 @@ public class Settings
         LoadSettings();
     }
 
-    public static string FilePath => Application.persistentDataPath + "/__modsettings.json";
+    public static string FilePath => Application.persistentDataPath + "/UImodsettings.json";
 
 
     public static void LoadSettings()
@@ -44,24 +42,22 @@ public class Settings
         File.WriteAllText(FilePath, JsonUtility.ToJson(instance, true));
     }
 
-    private static int sanitizeSpeed(int fps) => fps < 1 ? 30 : fps;
-
-    public static int GetGameSpeedByIndex(int idx) => sanitizeSpeed(
-        idx==0 ? instance.normalFps:
+    public static int GetGameSpeedByIndex(int idx) => 
         idx==1 ? instance.fastFps:
         idx==2 ? instance.turboFps:
-        instance.normalFps);
+        instance.normalFps;
 
     public static Settings instance = new Settings();
 
     public bool skipLogos = true;
 
-    public int normalFps = 30;
-    public int fastFps = 60;
-    public int turboFps = 90;
+    public int normalFps = 1;
+    public int fastFps = 2;
+    public int turboFps = 3;
 
     public int battleSpeed = 0;
     public int fieldSpeed = 0;
+    public int otherSpeed = 0;
 
     public int enTextSpeed = 1;
     public int jpTextSpeed = 2;
@@ -83,9 +79,9 @@ public static class TrackGameStateChanges
 
     public static void SetGameSpeedByState(GameCore.State state) =>
         Application.targetFrameRate =
-        state == GameCore.State.BATTLE ? Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
-        state == GameCore.State.FIELD ? Settings.GetGameSpeedByIndex(Settings.instance.fieldSpeed) :
-                                        60;
+        state == GameCore.State.BATTLE ? 30 * Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
+        state == GameCore.State.FIELD ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.fieldSpeed) :
+                                        30 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed);
 
     public static void IncrementCurrentGameStateSpeed()
     {
@@ -102,6 +98,13 @@ public static class TrackGameStateChanges
         else if (s == GameCore.State.FIELD)
         {
             Settings.instance.fieldSpeed = (Settings.instance.fieldSpeed + 1) % 3;
+            Settings.WriteSettings();
+
+            SetGameSpeedByState(s);
+        }
+        else
+        {
+            Settings.instance.otherSpeed = (Settings.instance.otherSpeed + 1) % 3;
             Settings.WriteSettings();
 
             SetGameSpeedByState(s);
@@ -158,16 +161,6 @@ public static class SpeedOptions
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(Field), "Update")]
-public static class FPSFix
-{
-    public static bool Prefix()
-    {
-        RS3UI.frame += 1;
-        return true;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(Character), "Update")]
 public static class FPSFix4
 {
@@ -202,101 +195,101 @@ public static class FPSFix5
 }
 
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
-public static class FPSFix2
-{
-    public static bool Prefix(BattleLogic.BattleScene __instance)
-    {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-        {
-            return false;
-        }
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
+//public static class FPSFix2
+//{
+//    public static bool Prefix(BattleLogic.BattleScene __instance)
+//    {
+//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+//        {
+//            return false;
+//        }
+//        return true;
+//    }
+//}
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_result_anim")]
-public static class FPSFix6
-{
-    public static bool Prefix(BattleLogic.BattleScene __instance)
-    {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-        {
-            return false;
-        }
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_result_anim")]
+//public static class FPSFix6
+//{
+//    public static bool Prefix(BattleLogic.BattleScene __instance)
+//    {
+//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+//        {
+//            return false;
+//        }
+//        return true;
+//    }
+//}
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_appear_anim")]
-public static class FPSFix7
-{
-    public static bool Prefix(BattleLogic.BattleScene __instance)
-    {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-        {
-            return false;
-        }
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_appear_anim")]
+//public static class FPSFix7
+//{
+//    public static bool Prefix(BattleLogic.BattleScene __instance)
+//    {
+//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+//        {
+//            return false;
+//        }
+//        return true;
+//    }
+//}
 
-[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
-public static class FPSFix8
-{
-    public static bool Prefix(BattleEffect __instance)
-    {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-        {
-            //if (__instance._mess_queue.Count != 0)
-            //{
-            //    if (__instance._mess_queue.Peek().is_mess_end())
-            //    {
-            //        Utility_T_H.BattleMess battleMess = __instance._mess_queue.Dequeue();
-            //        battleMess.Release();
-            //    }
-            //    else
-            //    {
-            //        __instance._mess_queue.Peek().Draw();
-            //    }
-            //}
-            List<BattleAction> m_cmd_task = HarmonyLib.Traverse.Create(__instance).Field("m_cmd_task").GetValue<List<BattleAction>>();
-            List<Monster> m_monsters = HarmonyLib.Traverse.Create(__instance).Field("m_monsters").GetValue<List<Monster>>();
-            BattleEffect.DISP_PHASE m_disp_phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-            if (m_cmd_task[__instance.m_act_cnt]._me.Count != 0 && m_disp_phase == BattleEffect.DISP_PHASE.SKILL_WINDOW)
-            {
-                BattleLogic.BattleUnitManager enemy_mng = GameCore.m_battle._enemy_mng;
-                if (m_cmd_task[__instance.m_act_cnt]._me[0] >= 10)
-                {
-                    if (!BattleWork.op_ev_btl_flag)
-                    {
-                        for (int k = 0; k < m_cmd_task[__instance.m_act_cnt]._me.Count; k++)
-                        {
-                            string acter_name = m_cmd_task[__instance.m_act_cnt]._acter_name;
-                            if (acter_name != null)
-                            {
-                                if (!(acter_name == string.Empty))
-                                {
-                                    int num9 = m_cmd_task[__instance.m_act_cnt]._me[k] - 10;
-                                    if (BattleWork.nezumi_event_flag)
-                                    {
-                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[18].x - 60, (int)__instance.m_position[18].y + 135, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
-                                    }
-                                    else
-                                    {
-                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].x, (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].y, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
+//public static class FPSFix8
+//{
+//    public static bool Prefix(BattleEffect __instance)
+//    {
+//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+//        {
+//            //if (__instance._mess_queue.Count != 0)
+//            //{
+//            //    if (__instance._mess_queue.Peek().is_mess_end())
+//            //    {
+//            //        Utility_T_H.BattleMess battleMess = __instance._mess_queue.Dequeue();
+//            //        battleMess.Release();
+//            //    }
+//            //    else
+//            //    {
+//            //        __instance._mess_queue.Peek().Draw();
+//            //    }
+//            //}
+//            List<BattleAction> m_cmd_task = HarmonyLib.Traverse.Create(__instance).Field("m_cmd_task").GetValue<List<BattleAction>>();
+//            List<Monster> m_monsters = HarmonyLib.Traverse.Create(__instance).Field("m_monsters").GetValue<List<Monster>>();
+//            BattleEffect.DISP_PHASE m_disp_phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
+//            if (m_cmd_task[__instance.m_act_cnt]._me.Count != 0 && m_disp_phase == BattleEffect.DISP_PHASE.SKILL_WINDOW)
+//            {
+//                BattleLogic.BattleUnitManager enemy_mng = GameCore.m_battle._enemy_mng;
+//                if (m_cmd_task[__instance.m_act_cnt]._me[0] >= 10)
+//                {
+//                    if (!BattleWork.op_ev_btl_flag)
+//                    {
+//                        for (int k = 0; k < m_cmd_task[__instance.m_act_cnt]._me.Count; k++)
+//                        {
+//                            string acter_name = m_cmd_task[__instance.m_act_cnt]._acter_name;
+//                            if (acter_name != null)
+//                            {
+//                                if (!(acter_name == string.Empty))
+//                                {
+//                                    int num9 = m_cmd_task[__instance.m_act_cnt]._me[k] - 10;
+//                                    if (BattleWork.nezumi_event_flag)
+//                                    {
+//                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[18].x - 60, (int)__instance.m_position[18].y + 135, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
+//                                    }
+//                                    else
+//                                    {
+//                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].x, (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].y, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            return false;
+//        }
+//        return true;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(Field), "CharaUpdate")]
 public static class FPSFix3
@@ -725,9 +718,9 @@ public static class CompactUI2
         int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
         BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("window").GetValue<BattleCommandWindow>();
         if (6 < menuElement)
-            commandWindow.SetWindowSize(270, 172);
+            commandWindow.SetWindowSize(250, 172);
         else
-            commandWindow.SetWindowSize(270, 16 + menuElement * 26);
+            commandWindow.SetWindowSize(250, 16 + menuElement * 26);
         commandWindow.SetWindowPos(55, RS3UI.commandY-10);
         return false;
     }
@@ -743,11 +736,11 @@ public static class CompactUI4
 
         if (6 < menuElement)
         {
-            commandWindow.SetWindowSize(270, 172);
+            commandWindow.SetWindowSize(240, 172);
         }
         else
         {
-            commandWindow.SetWindowSize(270, 16 + menuElement * 26);
+            commandWindow.SetWindowSize(240, 16 + menuElement * 26);
         }
 
         commandWindow.SetWindowPos(55, RS3UI.commandY - 10);
@@ -777,7 +770,7 @@ public static class CompactUI3
         CommandPageNameWindow commandPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("commandPageNameWindow").GetValue<CommandPageNameWindow>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(commandPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
-        cVariableWindow.SetSize(180, 32);
+        cVariableWindow.SetSize(160, 32);
     }
 }
 
@@ -789,7 +782,29 @@ public static class CompactUI6
         CommanderPageNameWin cmdPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("cmdPageNameWindow").GetValue<CommanderPageNameWin>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(cmdPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
-        cVariableWindow.SetSize(380, 32);
+        cVariableWindow.SetSize(340, 32);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { typeof(int),typeof(int) })]
+public static class CompactUI7
+{
+    public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
+    {
+        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
+        m_Window.SetSize(GS.StrDot("M") * WordCountX * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { })]
+public static class CompactUI8
+{
+    public static void Postfix(ref CVariableMessagePlus __instance)
+    {
+        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
+        int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
+        int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
+        m_Window.SetSize(GS.StrDot("M") * m_WordCountX * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -844,7 +859,7 @@ public static class DisableTextScroll2
         string line2 = "";
         GS.m_font_scale_x = 0.5f;
         GS.m_font_scale_y = 0.5f;
-        if (descText.Length > 70)
+        if (descText.Length > 90)
         {
             try
             {
@@ -892,7 +907,7 @@ public static class DisableTextScroll3
         string line2 = "";
         GS.m_font_scale_x = 0.5f;
         GS.m_font_scale_y = 0.5f;
-        if (descText.Length > 70)
+        if (descText.Length > 90)
         {
             try
             {
@@ -936,7 +951,7 @@ public static class TextPosition
             if (_x == 465)
                 return false;
             else if (_x >= 573 && _x <= 593)
-                _x -= 170;
+                _x -= 180;
             _x -= 125;
             for (int i = 0; i < 8; i++)
             {
@@ -1151,6 +1166,71 @@ public static class FontSize2
         {
             GS.FontSize = 20f;
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(GS), "InitFont")]
+public static class FontChange
+{
+    public static bool Prefix(ref GS.FontType type, ref string name)
+    {
+        if (GS.m_font[(int)type] != null)
+        {
+            Resources.UnloadAsset(GS.m_font[(int)type]);
+            Util.Destroy(GS.m_font_mtl[(int)type]);
+            Util.Destroy(GS.m_shadow_mtl[(int)type]);
+            Util.Destroy(GS.m_rim_mtl[(int)type]);
+            Util.Destroy(GS.m_font_mtl_w[(int)type]);
+            Util.Destroy(GS.m_shadow_mtl_w[(int)type]);
+            Util.Destroy(GS.m_rim_mtl_w[(int)type]);
+            Util.Destroy(GS.m_d_font_mtl[(int)type]);
+            Util.Destroy(GS.m_d_shadow_mtl[(int)type]);
+        }
+        if (File.Exists("rs3font.ttf"))
+        {
+            AssetBundle ab = AssetBundle.LoadFromFile("rs3font");
+            foreach (string s in ab.GetAllAssetNames())
+                Msg(s);
+            GS.m_font[(int)type] = ab.LoadAsset<Font>("rs3font.ttf");
+            Msg("Loaded rs3font.ttf");
+        }
+        else
+            GS.m_font[(int)type] = (Font)Resources.Load(name);
+
+        GS.m_font_mtl[(int)type] = ShaderUtil.CreateMaterial(ShaderUtil.Type.FONT);
+        GS.m_font_mtl[(int)type].mainTexture = GS.m_font[(int)type].material.mainTexture;
+        GS.m_font_mtl[(int)type].color = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
+        GS.m_font_mtl[(int)type].renderQueue = 6001;
+        ShaderUtil.SetDepthTest(GS.m_font_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
+        GS.m_shadow_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        ShaderUtil.SetDepthTest(GS.m_shadow_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
+        GS.m_shadow_mtl[(int)type].renderQueue = 6000;
+        GS.m_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 128);
+        GS.m_rim_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        ShaderUtil.SetDepthTest(GS.m_rim_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
+        GS.m_rim_mtl[(int)type].renderQueue = 6000;
+        GS.m_font_mtl_w[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        ShaderUtil.SetDepthTest(GS.m_font_mtl_w[(int)type], UnityEngine.Rendering.CompareFunction.Equal);
+        ShaderUtil.SetDepth(GS.m_font_mtl_w[(int)type], 0.5f);
+        GS.m_font_mtl_w[(int)type].renderQueue = 6001;
+        GS.m_shadow_mtl_w[(int)type] = new Material(GS.m_font_mtl_w[(int)type]);
+        ShaderUtil.SetDepthTest(GS.m_shadow_mtl_w[(int)type], UnityEngine.Rendering.CompareFunction.Equal);
+        ShaderUtil.SetDepth(GS.m_shadow_mtl_w[(int)type], 0.5f);
+        GS.m_shadow_mtl_w[(int)type].renderQueue = 6000;
+        GS.m_shadow_mtl_w[(int)type].color = new Color32(0, 0, 0, 128);
+        GS.m_rim_mtl_w[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        ShaderUtil.SetDepthTest(GS.m_rim_mtl_w[(int)type], UnityEngine.Rendering.CompareFunction.Equal);
+        ShaderUtil.SetDepth(GS.m_rim_mtl_w[(int)type], 0.5f);
+        GS.m_rim_mtl_w[(int)type].renderQueue = 6000;
+        GS.m_d_font_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        GS.m_d_font_mtl[(int)type].renderQueue = 8501;
+        ShaderUtil.SetDepthTest(GS.m_d_font_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
+        GS.m_d_shadow_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        ShaderUtil.SetDepthTest(GS.m_d_shadow_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
+        GS.m_d_shadow_mtl[(int)type].renderQueue = 8500;
+        GS.m_d_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 128);
+
+        return false;
     }
 }
 
