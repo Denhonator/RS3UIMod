@@ -4,6 +4,7 @@ using UnityEngine;
 using static MelonLoader.MelonLogger;
 using System.IO;
 using System;
+using System.Collections.Generic;
 
 //[HarmonyLib.HarmonyPatch(typeof(Il2CppMakimono.AnimationDirector), "GetCurrentState", new Type[] { typeof(int) })]
 //class PlayTime
@@ -81,6 +82,8 @@ public static class TrackGameStateChanges
         Application.targetFrameRate =
         state == GameCore.State.BATTLE ? 30 * Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
         state == GameCore.State.FIELD ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.fieldSpeed) :
+        state == GameCore.State.MENU ? 60 :
+        state == GameCore.State.TITLE ? 60 :
                                         30 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed);
 
     public static void IncrementCurrentGameStateSpeed()
@@ -194,6 +197,43 @@ public static class FPSFix5
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(FldObject), "Update")]
+public static class FPSFix2
+{
+    public static bool Prefix(FldObject __instance)
+    {
+        if (!__instance.m_data_path.Contains("fire"))
+            HarmonyLib.Traverse.Create(__instance).Field("m_frame_rate_speed").SetValue(Application.targetFrameRate > 30 ? 1 : 2);
+        else if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "Update")]
+public static class FPSFix6
+{
+    public static void Prefix(ScriptDrive __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.realFrameCount > 0)
+            __instance.realFrameCount -= 1;
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.virtualFrameCount > 0)
+            __instance.virtualFrameCount -= 1;
+        int keyDelay = HarmonyLib.Traverse.Create(__instance).Field("keyDelay").GetValue<int>();
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && keyDelay > 0)
+            HarmonyLib.Traverse.Create(__instance).Field("keyDelay").SetValue(keyDelay + 1);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Window), "updateSelectlineAlpha")]
+public static class FPSFix7
+{
+    public static void Prefix(ref int method, Window __instance)
+    {
+        if(method == 1)
+            __instance.m_delta = Mathf.Sign(__instance.m_delta) * Time.deltaTime*3f;
+    }
+}
 
 //[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
 //public static class FPSFix2
@@ -710,6 +750,75 @@ public static class ReplaceTexture4
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(Window), "AddString")]
+public static class WhiteText
+{
+    public static void Prefix(ref string str, ref int tx, ref int ty, ref int col, ref Window __instance)
+    {
+        if (col == 0)
+            col = 3;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MessageWindow), HarmonyLib.MethodType.Constructor, new Type[] { typeof(int) })]
+public static class CompactDialog
+{
+    public static void Postfix(ref MessageWindow __instance)
+    {
+        HarmonyLib.Traverse.Create(__instance).Field("height1Line").SetValue(30);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Window), HarmonyLib.MethodType.Constructor)]
+public static class WhiteText2
+{
+    public static void Prefix(ref Window __instance)
+    {
+        __instance.m_frame_alpha = 1.0f;
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_winSize")]
+//public static class TextBoxHeight
+//{
+//    public static void Postfix(ref ScriptDrive __instance)
+//    {
+//        __instance.nextWinRow = Mathf.Min(__instance.nextWinRow, 3);
+//    }
+//}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "SetMessageWindowByNPC")]
+public static class TextBoxHeight2
+{
+    public static void Prefix(ref int id, ref int mapinfoNpcNo, ref int dotwidth, ref int row, ref ScriptDrive __instance)
+    {
+        __instance.messageWindow[id].lowerMargin = -row * 5;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "AddTouch", new Type[] { typeof(int),typeof(int),typeof(int),typeof(int) })]
+public static class TextBoxHeight3
+{
+    public static void Prefix(ref int element, ref int px, ref int py, ref int width)
+    {
+        py -= 5;
+    }
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)35).opcode)
+            {
+                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)30);
+            }
+            else
+            {
+                yield return code;
+            }
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(CommandMode), "SetWindowSize", new Type[] { })]
 public static class CompactUI2
 {
@@ -1169,6 +1278,26 @@ public static class FontSize2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(GS), "DrawString")]
+public static class TextOutline
+{
+    public static void Prefix(ref Color32 color, ref GS.FontEffect effect)
+    {
+        //if (effect == GS.FontEffect.SHADOW)
+        //    effect = GS.FontEffect.RIM;
+        if (effect == GS.FontEffect.SHADOW_WINDOW)
+            effect = GS.FontEffect.RIM_WINDOW;
+        if(color.r < 50 && effect == GS.FontEffect.RIM)
+        {
+            color = new Color32(255, 255, 255, 255);
+        }
+        if(color.r < 50 && effect == GS.FontEffect.CURSOR)
+        {
+            color = new Color32(255, 255, 255, color.a);
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(GS), "InitFont")]
 public static class FontChange
 {
@@ -1207,6 +1336,7 @@ public static class FontChange
         GS.m_shadow_mtl[(int)type].renderQueue = 6000;
         GS.m_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 128);
         GS.m_rim_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        GS.m_rim_mtl[(int)type].color = new Color32(0, 0, 0, 128);
         ShaderUtil.SetDepthTest(GS.m_rim_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
         GS.m_rim_mtl[(int)type].renderQueue = 6000;
         GS.m_font_mtl_w[(int)type] = new Material(GS.m_font_mtl[(int)type]);
@@ -1219,6 +1349,7 @@ public static class FontChange
         GS.m_shadow_mtl_w[(int)type].renderQueue = 6000;
         GS.m_shadow_mtl_w[(int)type].color = new Color32(0, 0, 0, 128);
         GS.m_rim_mtl_w[(int)type] = new Material(GS.m_font_mtl[(int)type]);
+        GS.m_rim_mtl_w[(int)type].color = new Color32(0, 0, 0, 128);
         ShaderUtil.SetDepthTest(GS.m_rim_mtl_w[(int)type], UnityEngine.Rendering.CompareFunction.Equal);
         ShaderUtil.SetDepth(GS.m_rim_mtl_w[(int)type], 0.5f);
         GS.m_rim_mtl_w[(int)type].renderQueue = 6000;
@@ -1228,7 +1359,7 @@ public static class FontChange
         GS.m_d_shadow_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
         ShaderUtil.SetDepthTest(GS.m_d_shadow_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
         GS.m_d_shadow_mtl[(int)type].renderQueue = 8500;
-        GS.m_d_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 128);
+        GS.m_d_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 255);
 
         return false;
     }
