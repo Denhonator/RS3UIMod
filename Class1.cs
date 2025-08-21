@@ -215,10 +215,10 @@ public static class FPSFix6
 {
     public static void Prefix(ScriptDrive __instance)
     {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.realFrameCount > 0)
-            __instance.realFrameCount -= 1;
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.virtualFrameCount > 0)
-            __instance.virtualFrameCount -= 1;
+        //if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.realFrameCount > 0)
+        //    __instance.realFrameCount -= 1;
+        //if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.virtualFrameCount > 0)
+        //    __instance.virtualFrameCount -= 1;
         int keyDelay = HarmonyLib.Traverse.Create(__instance).Field("keyDelay").GetValue<int>();
         if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && keyDelay > 0)
             HarmonyLib.Traverse.Create(__instance).Field("keyDelay").SetValue(keyDelay + 1);
@@ -232,6 +232,106 @@ public static class FPSFix7
     {
         if(method == 1)
             __instance.m_delta = Mathf.Sign(__instance.m_delta) * Time.deltaTime*3f;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field), "SetEventScroll")]
+public static class FPSFix8
+{
+    public static void Prefix(ref int x, ref int y, ref int frame, Field __instance)
+    {
+        frame *= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_wait")]
+public static class FPSFix9
+{
+    private static int HexStringToInt(string hexstr)
+    {
+        string text = hexstr.ToLower();
+        return int.Parse(text, System.Globalization.NumberStyles.HexNumber);
+    }
+
+    public static void Prefix(ScriptDrive __instance)
+    {
+        string[] array = HarmonyLib.Traverse.Create(__instance).Field("currentParameter").GetValue<string[]>();
+        if (array[0][0] == '$')
+        {
+            int w = HexStringToInt(array[0].Substring(1)) * 2;
+            array[0] = "$" + w.ToString("X");
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_moveKeepDir")]
+public static class FPSFix11
+{
+    public static int StringToInt(string str)
+    {
+        int num;
+        try
+        {
+            num = Convert.ToInt32(str.ToLower());
+        }
+        catch (Exception)
+        {
+            num = 0;
+        }
+        return num;
+    }
+
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_8).opcode)
+            {
+                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)16);
+            }
+            else
+            {
+                yield return code;
+            }
+        }
+    }
+
+    //public static void Prefix(ActionVM __instance, out int __state)
+    //{
+    //    int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
+    //    int actionCounter = HarmonyLib.Traverse.Create(__instance).Field("actionCounter").GetValue<int>();
+    //    string[] currentActionParameter = HarmonyLib.Traverse.Create(__instance).Field("currentActionParameter").GetValue<string[]>();
+    //    if (!currentActionParameter[0].Contains(";"))
+    //    {
+    //        currentActionParameter[0] = (StringToInt(currentActionParameter[0])).ToString();
+    //    }
+    //    __state = waitCounter;
+    //}
+
+    //public static void Postfix(ActionVM __instance, int __state)
+    //{
+    //    int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
+    //    if(waitCounter > __state)
+    //    {
+    //        HarmonyLib.Traverse.Create(__instance).Field("waitCounter").SetValue(waitCounter * 2 + 1);
+    //    }
+    //}
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_stay")]
+public static class FPSFix12
+{
+    public static void Prefix(ref int opt, ActionVM __instance)
+    {
+        int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
+        if (waitCounter < 0)
+        {
+            string[] currentActionParameter = HarmonyLib.Traverse.Create(__instance).Field("currentActionParameter").GetValue<string[]>();
+            if (!currentActionParameter[0].Contains(";"))
+            {
+                currentActionParameter[0] = (FPSFix11.StringToInt(currentActionParameter[0]) * 2).ToString();
+            }
+        }
     }
 }
 
@@ -494,7 +594,7 @@ public static class FPSFix3
 
                 if (num >= 2)
                     num /= fpsmult;
-                else if(fpsmult >= 2 && (Time.frameCount % fpsmult) != 0)
+                else if(fpsmult >= 2 && (Time.frameCount % 2) != 0)
                 {
                     return false;
                 }
@@ -544,7 +644,7 @@ public static class FPSFix3
             {
                 if (num >= 2)
                     num /= fpsmult;
-                else if(fpsmult >= 2 && (Time.frameCount % fpsmult) != 0)
+                else if (fpsmult >= 2 && (Time.frameCount % 2) == 0)
                 {
                     return false;
                 }
@@ -1246,37 +1346,37 @@ public static class CommandDraw5
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "font_reset", new Type[] { })]
-public static class FontSize
-{
-    public static void Postfix()
-    {
-        if (GameCore.m_userProfile.language == 0)
-        {
-            GS.FontSize = 30f;
-        }
-        else
-        {
-            GS.FontSize = 20f;
-        }
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "font_reset", new Type[] { })]
+//public static class FontSize
+//{
+//    public static void Postfix()
+//    {
+//        if (GameCore.m_userProfile.language == 0)
+//        {
+//            GS.FontSize = 30f;
+//        }
+//        else
+//        {
+//            GS.FontSize = 20f;
+//        }
+//    }
+//}
 
-[HarmonyLib.HarmonyPatch(typeof(GameCore), "InitUserProfile", new Type[] { })]
-public static class FontSize2
-{
-    public static void Postfix()
-    {
-        if (GameCore.m_userProfile.language == 0)
-        {
-            GS.FontSize = 30f;
-        }
-        else
-        {
-            GS.FontSize = 20f;
-        }
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(GameCore), "InitUserProfile", new Type[] { })]
+//public static class FontSize2
+//{
+//    public static void Postfix()
+//    {
+//        if (GameCore.m_userProfile.language == 0)
+//        {
+//            GS.FontSize = 30f;
+//        }
+//        else
+//        {
+//            GS.FontSize = 20f;
+//        }
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(GS), "DrawString")]
 public static class TextOutline
