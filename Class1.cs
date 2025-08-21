@@ -295,27 +295,6 @@ public static class FPSFix11
             }
         }
     }
-
-    //public static void Prefix(ActionVM __instance, out int __state)
-    //{
-    //    int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
-    //    int actionCounter = HarmonyLib.Traverse.Create(__instance).Field("actionCounter").GetValue<int>();
-    //    string[] currentActionParameter = HarmonyLib.Traverse.Create(__instance).Field("currentActionParameter").GetValue<string[]>();
-    //    if (!currentActionParameter[0].Contains(";"))
-    //    {
-    //        currentActionParameter[0] = (StringToInt(currentActionParameter[0])).ToString();
-    //    }
-    //    __state = waitCounter;
-    //}
-
-    //public static void Postfix(ActionVM __instance, int __state)
-    //{
-    //    int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
-    //    if(waitCounter > __state)
-    //    {
-    //        HarmonyLib.Traverse.Create(__instance).Field("waitCounter").SetValue(waitCounter * 2 + 1);
-    //    }
-    //}
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_stay")]
@@ -451,11 +430,14 @@ public static class FPSFix3
             return false;
         }
         int fpsmult = Application.targetFrameRate > 30 ? 2 : 1;
-        int num = ch.GetSpeedDot();
         repeat = 0;
+
+        if (ch.m_dash && ((ch.m_x % 2) != 0) || ((ch.m_y % 2) != 0))
+            ch.m_dash = false;
 
         while (repeat >= 0)
         {
+            int num = ch.GetSpeedDot();
             int prevx = ch.m_x;
 
             int attr = __instance.m_bg.GetAttr(ch.m_cell_x, ch.m_cell_y);
@@ -548,7 +530,7 @@ public static class FPSFix3
                     ch.m_force_dir = 1;
                 }
             }
-            if(repeat==0)
+            if(repeat==0 && !(fpsmult >= 2 && (Time.frameCount % 2) == 0 && ch.m_dash))
                 ch.Update();
             if (ch.m_script_move)
             {
@@ -592,16 +574,11 @@ public static class FPSFix3
                     num = 4;
                 }
 
-                if (num >= 2)
+                if (num >= 2 && !ch.m_dash)
                     num /= fpsmult;
-                else if(fpsmult >= 2 && (Time.frameCount % 2) != 0)
+                else if(fpsmult >= 2 && (Time.frameCount % 2) != 0 && !ch.m_dash)
                 {
                     return false;
-                }
-                if (fpsmult == 2 && num == 2 && repeat == 0 && ch.m_jump_cnt <= 0)
-                {
-                    repeat = 2;
-                    ch.m_time -= 1;
                 }
 
                 if (ch.m_x != num3)
@@ -648,11 +625,8 @@ public static class FPSFix3
                 {
                     return false;
                 }
-                if (fpsmult == 2 && num == 2 && repeat == 0 && ch.m_jump_cnt <= 0)
-                {
-                    repeat = 2;
-                    ch.m_time -= 1;
-                }
+                if (ch.m_dash)
+                    num = 2;
 
                 if (ch.m_x != num3)
                 {
