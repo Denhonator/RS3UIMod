@@ -16,7 +16,4 @@ You need something like MelonLoader https://github.com/LavaGang/MelonLoader
 Then put the ReplaceTexture, rs3font and Mods folder from the releases page into the game folder (or compile the mod yourself with VS 2017)
 
 ### How it looks
-Battle UI:
 <img width="1910" height="1062" alt="Screenshot 2025-08-21 163828" src="https://github.com/user-attachments/assets/c732036d-67bf-44c2-9dfc-395cc9a65330" />
-60 FPS Movement (Depending on the video playback in the browser it might not look as smooth as it is):
-https://github.com/user-attachments/assets/5cfae545-237a-4017-b090-f3d6a9e51545
