@@ -1,4 +1,5 @@
 ## RS3 UI Enhancement Mod
+
 This mod aims to make the UI and some other features more like the original game and less like a phone game.
 Included features:
 * Font replacement for something sharper and closer to the SFC version
@@ -13,3 +14,6 @@ Let me know if there are bugs or something running at double speed.
 ### Install
 You need something like MelonLoader https://github.com/LavaGang/MelonLoader  
 Then put the ReplaceTexture, rs3font and Mods folder from the releases page into the game folder (or compile the mod yourself with VS 2017)
+
+### How it looks
+<img width="1910" height="1062" alt="Screenshot 2025-08-21 163828" src="https://github.com/user-attachments/assets/c732036d-67bf-44c2-9dfc-395cc9a65330" />
