@@ -775,7 +775,7 @@ public static class DisablePointWindow
             return false;
         int num = HarmonyLib.Traverse.Create(__instance).Field("currentDrawPoint").GetValue<int>();
         int num2 = HarmonyLib.Traverse.Create(__instance).Field("maxDrawPoint").GetValue<int>();
-        GS.DrawStringMenu(string.Format("{0} / {1}", num, num2), 920, 28, 0, Color.white, GS.FontEffect.CURSOR, 1, 3, 0.8f);
+        GS.DrawStringMenu(string.Format("{0} / {1}", num, num2), 920, 29, 0, Color.white, GS.FontEffect.RIM, 1, 3, 0.8f);
         return false;
     }
 }
@@ -794,6 +794,7 @@ public static class ReplaceTexture3
             texture.LoadImage(data, true);
             sprite.SetTexture(texture, false);
             HarmonyLib.Traverse.Create(__instance).Field("posX").SetValue(630);
+            HarmonyLib.Traverse.Create(__instance).Field("posY").SetValue(11);
         }
         catch(Exception e)
         {
@@ -816,6 +817,7 @@ public static class ReplaceTexture4
             texture.LoadImage(data, true);
             sprite.SetTexture(texture, false);
             HarmonyLib.Traverse.Create(__instance).Field("posX").SetValue(630);
+            HarmonyLib.Traverse.Create(__instance).Field("posY").SetValue(11);
         }
         catch (Exception e)
         {
@@ -901,10 +903,10 @@ public static class CompactUI2
         int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
         BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("window").GetValue<BattleCommandWindow>();
         if (6 < menuElement)
-            commandWindow.SetWindowSize(250, 172);
+            commandWindow.SetWindowSize(270, 172);
         else
-            commandWindow.SetWindowSize(250, 16 + menuElement * 26);
-        commandWindow.SetWindowPos(55, RS3UI.commandY-10);
+            commandWindow.SetWindowSize(270, 16 + menuElement * 26);
+        commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
         return false;
     }
 }
@@ -919,14 +921,14 @@ public static class CompactUI4
 
         if (6 < menuElement)
         {
-            commandWindow.SetWindowSize(240, 172);
+            commandWindow.SetWindowSize(260, 172);
         }
         else
         {
-            commandWindow.SetWindowSize(240, 16 + menuElement * 26);
+            commandWindow.SetWindowSize(260, 16 + menuElement * 26);
         }
 
-        commandWindow.SetWindowPos(55, RS3UI.commandY - 10);
+        commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
         return false;
     }
 }
@@ -953,7 +955,7 @@ public static class CompactUI3
         CommandPageNameWindow commandPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("commandPageNameWindow").GetValue<CommandPageNameWindow>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(commandPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
-        cVariableWindow.SetSize(160, 32);
+        cVariableWindow.SetSize(180, 32);
     }
 }
 
@@ -965,7 +967,7 @@ public static class CompactUI6
         CommanderPageNameWin cmdPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("cmdPageNameWindow").GetValue<CommanderPageNameWin>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(cmdPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
-        cVariableWindow.SetSize(340, 32);
+        cVariableWindow.SetSize(370, 32);
     }
 }
 
@@ -975,7 +977,7 @@ public static class CompactUI7
     public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
     {
         CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        m_Window.SetSize(GS.StrDot("M") * WordCountX * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
+        m_Window.SetSize(GS.StrDot("M") * (WordCountX+1) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -987,7 +989,7 @@ public static class CompactUI8
         CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
         int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
         int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
-        m_Window.SetSize(GS.StrDot("M") * m_WordCountX * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
+        m_Window.SetSize(GS.StrDot("M") * (m_WordCountX+1) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -997,7 +999,7 @@ public static class CursorPosition
     public static void Postfix(ref string[] _array, ref string _name, CommandCursor __instance)
     {
         int num = Array.IndexOf(_array, _name);
-        __instance.commandCursor.SetPos(18, RS3UI.commandY-6 + num * 26);
+        __instance.commandCursor.SetPos(18, RS3UI.commandY - 3 + num * 26);
     }
 }
 
@@ -1007,7 +1009,7 @@ public static class CursorPosition2
     public static void Postfix(ref string[] _array, ref string _name, CommanderCursor __instance)
     {
         int num = Array.IndexOf(_array, _name);
-        __instance.commandCursor.SetPos(18, RS3UI.commandY - 6 + num * 26);
+        __instance.commandCursor.SetPos(18, RS3UI.commandY - 3 + num * 26);
     }
 }
 
@@ -1017,13 +1019,15 @@ public static class DisableTextScroll
     public static void Prefix(CommandDescText __instance)
     {
         HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
+        CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
         string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
         string[] descriptions = descText.Split('.');
         HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descriptions[0]+'.');
-        GS.m_font_scale_x = 0.5f;
-        GS.m_font_scale_y = 0.5f;
+        GS.m_font_scale_x = 0.6f;
+        GS.m_font_scale_y = 0.6f;
         if(descriptions.Length > 1 && descriptions[1].Length > 3)
-            GS.DrawString(descriptions[1]+'.', 170, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+            GS.DrawString(descriptions[1]+'.', 172, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+        cVariableWindow.SetPos(155, 462);
     }
     public static void Postfix()
     {
@@ -1035,13 +1039,29 @@ public static class DisableTextScroll
 [HarmonyLib.HarmonyPatch(typeof(CommanderDescText), "DescTextUpdate", new Type[] { })]
 public static class DisableTextScroll2
 {
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
+            {
+                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_3);
+            }
+            else
+            {
+                yield return code;
+            }
+        }
+    }
+
     public static void Prefix(CommanderDescText __instance)
     {
         HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
         string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
         string line2 = "";
-        GS.m_font_scale_x = 0.5f;
-        GS.m_font_scale_y = 0.5f;
+        GS.m_font_scale_x = 0.6f;
+        GS.m_font_scale_y = 0.6f;
+
         if (descText.Length > 90)
         {
             try
@@ -1059,8 +1079,10 @@ public static class DisableTextScroll2
                 HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
                 if (line2 != "")
                 {
-                    GS.DrawString(line2, 170, 495, 0, Color.white, GS.FontEffect.WINDOW);
+                    GS.DrawString(line2, 172, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
                 }
+                CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
+                cVariableWindow.SetPos(155, 462);
             }
             catch
             {
@@ -1088,8 +1110,9 @@ public static class DisableTextScroll3
         string descText = HarmonyLib.Traverse.Create(__instance).Field("m_Messgae").GetValue<string>();
         prevString = descText;
         string line2 = "";
-        GS.m_font_scale_x = 0.5f;
-        GS.m_font_scale_y = 0.5f;
+        GS.m_font_scale_x = 0.6f;
+        GS.m_font_scale_y = 0.6f;
+
         if (descText.Length > 90)
         {
             try
@@ -1107,7 +1130,7 @@ public static class DisableTextScroll3
                 if (line2 != "")
                 {
                     __instance.SetMessgae(descText);
-                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.RIM);
                 }
             }
             catch
@@ -1131,10 +1154,11 @@ public static class TextPosition
     {
         if (RS3UI.windowType == "Command")
         {
+            effect = GS.FontEffect.RIM;
             if (_x == 465)
                 return false;
             else if (_x >= 573 && _x <= 593)
-                _x -= 180;
+                _x -= 160;
             _x -= 125;
             for (int i = 0; i < 8; i++)
             {
@@ -1149,11 +1173,13 @@ public static class TextPosition
             }
         }
         else if (RS3UI.windowType == "PageName") {
+            effect = GS.FontEffect.RIM;
             _x = 75;
             _y -= 28;
         }
         else if (_x == 586)
         {
+            effect = GS.FontEffect.RIM;
             _x = 650;
         }
         return true;
