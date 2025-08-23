@@ -80,7 +80,7 @@ public static class TrackGameStateChanges
 
     public static void SetGameSpeedByState(GameCore.State state) =>
         Application.targetFrameRate =
-        state == GameCore.State.BATTLE ? 30 * Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
+        state == GameCore.State.BATTLE ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
         state == GameCore.State.FIELD ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.fieldSpeed) :
         state == GameCore.State.MENU ? 60 :
         state == GameCore.State.TITLE ? 60 :
@@ -165,7 +165,7 @@ public static class SpeedOptions
 }
 
 [HarmonyLib.HarmonyPatch(typeof(Character), "Update")]
-public static class FPSFix4
+public static class FPSFixCharacterAnime
 {
     public static void Prefix(Character __instance)
     {
@@ -187,7 +187,7 @@ public static class FPSFix4
 }
 
 [HarmonyLib.HarmonyPatch(typeof(MenuObjectCharacter), "Update")]
-public static class FPSFix5
+public static class FPSFixMenuCharacter
 {
     public static bool Prefix(MenuManager __instance)
     {
@@ -198,7 +198,7 @@ public static class FPSFix5
 }
 
 [HarmonyLib.HarmonyPatch(typeof(FldObject), "Update")]
-public static class FPSFix2
+public static class FPSFixFldObject
 {
     public static bool Prefix(FldObject __instance)
     {
@@ -211,7 +211,7 @@ public static class FPSFix2
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "Update")]
-public static class FPSFix6
+public static class FPSFixKeyDelay
 {
     public static void Prefix(ScriptDrive __instance)
     {
@@ -226,7 +226,7 @@ public static class FPSFix6
 }
 
 [HarmonyLib.HarmonyPatch(typeof(Window), "updateSelectlineAlpha")]
-public static class FPSFix7
+public static class FPSFixDialogBlink
 {
     public static void Prefix(ref int method, Window __instance)
     {
@@ -236,7 +236,7 @@ public static class FPSFix7
 }
 
 [HarmonyLib.HarmonyPatch(typeof(Field), "SetEventScroll")]
-public static class FPSFix8
+public static class FPSFixEventScroll
 {
     public static void Prefix(ref int x, ref int y, ref int frame, Field __instance)
     {
@@ -244,8 +244,38 @@ public static class FPSFix8
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(Field.AbissEvent), "Update")]
+public static class FPSFixAbiss
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_1);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field.d10out3Evnet), "Update")]
+public static class FPSFixd10out
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_1);
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_wait")]
-public static class FPSFix9
+public static class FPSFixWait2
 {
     private static int HexStringToInt(string hexstr)
     {
@@ -265,7 +295,7 @@ public static class FPSFix9
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_moveKeepDir")]
-public static class FPSFix11
+public static class FPSFixMoveKeepDir
 {
     public static int StringToInt(string str)
     {
@@ -298,7 +328,7 @@ public static class FPSFix11
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_stay")]
-public static class FPSFix12
+public static class FPSFixStay2
 {
     public static void Prefix(ref int opt, ActionVM __instance)
     {
@@ -308,14 +338,131 @@ public static class FPSFix12
             string[] currentActionParameter = HarmonyLib.Traverse.Create(__instance).Field("currentActionParameter").GetValue<string[]>();
             if (!currentActionParameter[0].Contains(";"))
             {
-                currentActionParameter[0] = (FPSFix11.StringToInt(currentActionParameter[0]) * 2).ToString();
+                currentActionParameter[0] = (FPSFixMoveKeepDir.StringToInt(currentActionParameter[0]) * 2).ToString();
             }
         }
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect.SSObject), "Update")]
+public static class FPSFixSSObject
+{   
+    public static bool Prefix(SSObject.Anime __instance)
+    {
+        if(Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Monster), "Update")]
+public static class FPSFixSSObject2
+{
+    public static bool Prefix(Monster __instance)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "draw")]
+public static class FPSFixSpecialEff
+{
+    public static bool Prefix(SpecialEffMonster __instance)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
+public static class FPSFixSSOExecter
+{
+    public static bool Prefix(BattleLogic.SSOExecter __instance)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
+public static class FPSFixBattleEffectStop
+{
+    static BattleEffect.DISP_PHASE lastPhase = BattleEffect.DISP_PHASE.WAIT;
+    public static bool Prefix(BattleEffect __instance)
+    {
+        BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
+        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW || phase == BattleEffect.DISP_PHASE.MOVE_CHAR
+                    || phase == BattleEffect.DISP_PHASE.WAIT || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME
+                    || phase == BattleEffect.DISP_PHASE.DISP_SKILL_RESULT || phase == BattleEffect.DISP_PHASE.TOTAL_ECLIPSE
+                    || phase == BattleEffect.DISP_PHASE.SERVANT_UP || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN;
+
+        if (slow && Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && lastPhase == phase)
+        {
+            if (RS3UI.enemyName != null)
+            {
+                RS3UI.enemyName.Invoke();
+                RS3UI.enemyName = null;
+            }
+            lastPhase = phase;
+            return false;
+        }
+        lastPhase = phase;
+        return true;
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(MoveManager), "update")]
+//public static class FPSFixMoveManager
+//{
+//    public static bool Prefix(MoveManager __instance)
+//    {
+//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+//            return false;
+//        return true;
+//    }
+//}
+
+[HarmonyLib.HarmonyPatch]
+public static class FPSFixFade
+{
+    public static System.Reflection.MethodBase TargetMethod()
+    {
+        Type type = HarmonyLib.AccessTools.FirstInner(typeof(BattleEffect), t => t.Name.Contains("BattleEffectBgFader"));
+        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("UpdateBgFader"));
+    }
+
+    public static void Prefix()
+    {
+        Msg("BgFader");
+    }
+
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_1);
+            else
+                yield return code;
+        }
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "DispatchMap")]
+//public static class FPSFixPrint
+//{
+//    public static void Prefix(ref string cmd, ActionVM __instance)
+//    {
+//        Msg("DispatchMap: " + cmd);
+//    }
+//}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "draw")]
-public static class FPSFix13
+public static class FPSFixWobble
 {
     public static void Prefix(BattleLogic.BattleScene __instance)
     {
@@ -343,7 +490,7 @@ public static class RasterParameter2
 }
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "TisouPlay", new Type[] {  })]
-public static class FPSFix14
+public static class FPSFixWeatherEffect
 {
     public static bool Prefix(BattleEffect __instance)
     {
@@ -389,104 +536,45 @@ public static class FPSFix14
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
-//public static class FPSFix2
-//{
-//    public static bool Prefix(BattleLogic.BattleScene __instance)
-//    {
-//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-//        {
-//            return false;
-//        }
-//        return true;
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
+public static class FPSFixBattleAnim
+{
+    public static bool Prefix(BattleLogic.BattleScene __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+            return false;
+        return true;
+    }
+}
 
-//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_result_anim")]
-//public static class FPSFix6
-//{
-//    public static bool Prefix(BattleLogic.BattleScene __instance)
-//    {
-//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-//        {
-//            return false;
-//        }
-//        return true;
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "ResultAnim")]
+public static class FPSFixResultAnim
+{
+    public static bool Prefix(BattleEffect __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+        {
+            if (__instance._frame_counter > 0)
+                __instance._frame_counter--;
+            return false;
+        }
+        return true;
+    }
+}
 
-//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_appear_anim")]
-//public static class FPSFix7
-//{
-//    public static bool Prefix(BattleLogic.BattleScene __instance)
-//    {
-//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-//        {
-//            return false;
-//        }
-//        return true;
-//    }
-//}
-
-//[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
-//public static class FPSFix8
-//{
-//    public static bool Prefix(BattleEffect __instance)
-//    {
-//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-//        {
-//            //if (__instance._mess_queue.Count != 0)
-//            //{
-//            //    if (__instance._mess_queue.Peek().is_mess_end())
-//            //    {
-//            //        Utility_T_H.BattleMess battleMess = __instance._mess_queue.Dequeue();
-//            //        battleMess.Release();
-//            //    }
-//            //    else
-//            //    {
-//            //        __instance._mess_queue.Peek().Draw();
-//            //    }
-//            //}
-//            List<BattleAction> m_cmd_task = HarmonyLib.Traverse.Create(__instance).Field("m_cmd_task").GetValue<List<BattleAction>>();
-//            List<Monster> m_monsters = HarmonyLib.Traverse.Create(__instance).Field("m_monsters").GetValue<List<Monster>>();
-//            BattleEffect.DISP_PHASE m_disp_phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-//            if (m_cmd_task[__instance.m_act_cnt]._me.Count != 0 && m_disp_phase == BattleEffect.DISP_PHASE.SKILL_WINDOW)
-//            {
-//                BattleLogic.BattleUnitManager enemy_mng = GameCore.m_battle._enemy_mng;
-//                if (m_cmd_task[__instance.m_act_cnt]._me[0] >= 10)
-//                {
-//                    if (!BattleWork.op_ev_btl_flag)
-//                    {
-//                        for (int k = 0; k < m_cmd_task[__instance.m_act_cnt]._me.Count; k++)
-//                        {
-//                            string acter_name = m_cmd_task[__instance.m_act_cnt]._acter_name;
-//                            if (acter_name != null)
-//                            {
-//                                if (!(acter_name == string.Empty))
-//                                {
-//                                    int num9 = m_cmd_task[__instance.m_act_cnt]._me[k] - 10;
-//                                    if (BattleWork.nezumi_event_flag)
-//                                    {
-//                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[18].x - 60, (int)__instance.m_position[18].y + 135, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
-//                                    }
-//                                    else
-//                                    {
-//                                        GS.DrawStringMenu(MenuListText.GetText(1, m_monsters[num9].m_monster_id, -1), (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].x, (int)__instance.m_position[m_cmd_task[__instance.m_act_cnt]._me[k]].y, k, Color.white, GS.FontEffect.SHADOW, 2, 3, 0.85f);
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//            return false;
-//        }
-//        return true;
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "SpinCharacter")]
+public static class FPSFixSpin
+{
+    public static bool Prefix(BattleEffect __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+            return false;
+        return true;
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(Field), "CharaUpdate")]
-public static class FPSFix3
+public static class FPSFixMovement
 {
     static int repeat = 0;
 
@@ -816,32 +904,6 @@ public static class ReplaceTexture
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BgMap), "LoadSync", new Type[] { })]
-public static class ReplaceTexture5
-{
-    private enum LoadState
-    {
-        ATTR,
-        OBJ,
-        OBJ_BG,
-        BG,
-        TEX,
-        ALPHA,
-        LAYER,
-        MASK,
-        SCROLL,
-        END
-    }
-
-    public static void Postfix(BgMap __instance)
-    {
-        LoadState m_load_state = HarmonyLib.Traverse.Create(__instance).Field("m_load_state").GetValue<LoadState>();
-        for (int i = 0; i < __instance.m_obj_texture.Count; i++) {
-            Msg(__instance.m_obj_texture[i].name);
-        }
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(BattleArtPointWindow), "Initialize", new Type[] {})]
 public static class ReplaceTexture2
 {
@@ -939,6 +1001,18 @@ public static class WhiteText3
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "StrFlashingUpdate")]
+public static class WhiteText4
+{
+    public static void Prefix(CommandMode __instance)
+    {
+        RS3UI.windowType = "CommandSelect";
+        float strColorAdd = HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").GetValue<float>();
+        float strColor = HarmonyLib.Traverse.Create(__instance).Field("strColor").GetValue<float>();
+        HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").SetValue(Mathf.Sign(strColorAdd) * 0.1f / (Application.targetFrameRate / 30f));
+    }
+}
+
 //[HarmonyLib.HarmonyPatch(typeof(CommandMode), "GetStringColor")]
 //public static class WhiteText4
 //{
@@ -1014,6 +1088,24 @@ public static class TextBoxHeight3
                 yield return code;
             }
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize_English")]
+public static class CompactUI
+{
+    public static void Postfix(ref string Message, CVariableMessagePlus __instance)
+    {
+        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
+        int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
+        int m_WindowSizeX = 0;
+        foreach (string text in __instance.m_Message)
+        {
+            if (m_WindowSizeX < GS.StrDot(text))
+                m_WindowSizeX = GS.StrDot(text);
+        }
+        int m_WindowSizeY = GS.StrDot("M") * (m_WordCountY + 1);
+        m_Window.SetSize(Mathf.Max(m_WindowSizeX+8, 80), m_WindowSizeY);
     }
 }
 
@@ -1099,7 +1191,7 @@ public static class CompactUI7
     public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
     {
         CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        m_Window.SetSize(GS.StrDot("M") * (WordCountX+2) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
+        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(WordCountX,10) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -1111,7 +1203,7 @@ public static class CompactUI8
         CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
         int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
         int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
-        m_Window.SetSize(GS.StrDot("M") * (m_WordCountX+2) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
+        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(m_WordCountX, 10) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -1283,12 +1375,12 @@ public static class DisableTextScroll3
 [HarmonyLib.HarmonyPatch(typeof(GS), "DrawStringMenu")]
 public static class TextPosition
 {
-    public static bool Prefix(ref string str, ref int _x, ref int _y, ref int _z, ref Color32 color, ref GS.FontEffect effect, ref int base_point_x, ref int base_pont_y, ref float scale)
+    public static bool Prefix(string str, ref int _x, ref int _y, int _z, Color32 color, ref GS.FontEffect effect, int base_point_x, int base_pont_y, ref float scale)
     {
         if (RS3UI.windowType.Contains("Command"))
         {
             scale = 1.0f;
-            if(RS3UI.windowType != "CommandSelect")
+            if (RS3UI.windowType != "CommandSelect")
                 effect = GS.FontEffect.RIM;
 
             if (_x == 465)
@@ -1304,11 +1396,12 @@ public static class TextPosition
                 }
                 else if (_y == 128 + i * 40)
                 {
-                    _y = RS3UI.commandY+2 + i * 26;
+                    _y = RS3UI.commandY + 2 + i * 26;
                 }
             }
         }
-        else if (RS3UI.windowType == "PageName") {
+        else if (RS3UI.windowType == "PageName")
+        {
             effect = GS.FontEffect.RIM;
             _x = 75;
             _y -= 28;
@@ -1317,6 +1410,11 @@ public static class TextPosition
         {
             effect = GS.FontEffect.RIM;
             _x = 650;
+        }
+        else
+        {
+            int x = _x; int y = _y; GS.FontEffect eff = effect; float s = scale;
+            RS3UI.enemyName = () => GS.DrawStringMenu(str, x, y, _z, color,  eff, base_point_x, base_pont_y, s);
         }
         return true;
     }
@@ -1527,7 +1625,7 @@ public static class TextOutline
             effect = GS.FontEffect.RIM_WINDOW;
         if(color.r < 10 && effect == GS.FontEffect.RIM)
         {
-            color = new Color32(255, 255, 255, 255);
+            color = new Color32(255, 255, 255, color.a);
         }
         if(color.r < 10 && effect == GS.FontEffect.CURSOR)
         {
@@ -1613,6 +1711,8 @@ namespace RS3
         public static int frame = 0;
         public static string replace = "";
         public static Vector2 rasterparameter = new Vector2(0f,0.02f);
+        public static Action enemyName = null;
+
         public override void OnUpdate()
         {
             if(Input.GetKeyDown(KeyCode.F1))
