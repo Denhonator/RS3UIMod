@@ -314,6 +314,81 @@ public static class FPSFix12
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "draw")]
+public static class FPSFix13
+{
+    public static void Prefix(BattleLogic.BattleScene __instance)
+    {
+        BattleLogic.BattleScene._raster_parameter_vy = RS3UI.rasterparameter.y * Time.deltaTime * -15f;
+        BattleLogic.BattleScene._raster_parameter_vx = RS3UI.rasterparameter.x * Time.deltaTime * 15f;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "change_last_bg_to_eclipse")]
+public static class RasterParameter
+{
+    public static void Postfix(BattleLogic.BattleScene __instance)
+    {
+        RS3UI.rasterparameter = new Vector2(BattleLogic.BattleScene._raster_parameter_vx, BattleLogic.BattleScene._raster_parameter_vy);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "change_last_bg_to_normal")]
+public static class RasterParameter2
+{
+    public static void Postfix(BattleLogic.BattleScene __instance)
+    {
+        RS3UI.rasterparameter = new Vector2(BattleLogic.BattleScene._raster_parameter_vx, BattleLogic.BattleScene._raster_parameter_vy);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "TisouPlay", new Type[] {  })]
+public static class FPSFix14
+{
+    public static bool Prefix(BattleEffect __instance)
+    {
+        BattleEffect.SSObject tisou_u = HarmonyLib.Traverse.Create(__instance).Field("tisou_u").GetValue<BattleEffect.SSObject>();
+        BattleEffect.SSObject tisou_d = HarmonyLib.Traverse.Create(__instance).Field("tisou_d").GetValue<BattleEffect.SSObject>();
+        bool isTisou = HarmonyLib.Traverse.Create(__instance).Field("isTisou").GetValue<bool>();
+        int before_id = HarmonyLib.Traverse.Create(__instance).Field("before_id").GetValue<int>();
+
+        int num = BattleWork.current_chisou_chi_id;
+        if (BattleWork.current_chisou_ten_id == 8)
+        {
+            num = 8;
+        }
+        if (num == 0 || !isTisou)
+            return false;
+        if (num != before_id)
+            return true;
+
+        if(Time.frameCount % (Application.targetFrameRate / 30) == 0)
+        {
+            tisou_d.Update();
+            tisou_u.Update();
+        }
+
+        tisou_d.Draw();
+        GS.BeginRenderTexture(0);
+        tisou_u.Draw();
+        GS.EndRenderTexture(0);
+        if (num == 8)
+        {
+            __instance.raster_param_x[0].z += 0.01f * Time.deltaTime * 30f;
+            __instance.raster_param_y[0].z += 0.02f * Time.deltaTime * 30f;
+            GS.DrawRasterTexture(0, 0, GS.GetRenderTexture(0), Color.white, __instance.raster_param_x[0], __instance.raster_param_y[0], 2700);
+        }
+        else
+        {
+            __instance.raster_param_x[num].z += 0.01f * Time.deltaTime * 30f;
+            __instance.raster_param_y[num].z += 0.02f * Time.deltaTime * 30f;
+            GS.DrawRasterTexture(0, 0, GS.GetRenderTexture(0), Color.white, __instance.raster_param_x[num], __instance.raster_param_y[num], 2700);
+        }
+
+        return false;
+    }
+}
+
 //[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "act_battle_anim")]
 //public static class FPSFix2
 //{
@@ -741,6 +816,32 @@ public static class ReplaceTexture
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BgMap), "LoadSync", new Type[] { })]
+public static class ReplaceTexture5
+{
+    private enum LoadState
+    {
+        ATTR,
+        OBJ,
+        OBJ_BG,
+        BG,
+        TEX,
+        ALPHA,
+        LAYER,
+        MASK,
+        SCROLL,
+        END
+    }
+
+    public static void Postfix(BgMap __instance)
+    {
+        LoadState m_load_state = HarmonyLib.Traverse.Create(__instance).Field("m_load_state").GetValue<LoadState>();
+        for (int i = 0; i < __instance.m_obj_texture.Count; i++) {
+            Msg(__instance.m_obj_texture[i].name);
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleArtPointWindow), "Initialize", new Type[] {})]
 public static class ReplaceTexture2
 {
@@ -825,6 +926,27 @@ public static class ReplaceTexture4
         }
     }
 }
+
+[HarmonyLib.HarmonyPatch(typeof(CommandMode), "StrFlashingUpdate")]
+public static class WhiteText3
+{
+    public static void Prefix(CommandMode __instance)
+    {
+        RS3UI.windowType = "CommandSelect";
+        float strColorAdd = HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").GetValue<float>();
+        float strColor = HarmonyLib.Traverse.Create(__instance).Field("strColor").GetValue<float>();
+        HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").SetValue(Mathf.Sign(strColorAdd) * 0.1f / (Application.targetFrameRate / 30f));
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(CommandMode), "GetStringColor")]
+//public static class WhiteText4
+//{
+//    public static void Postfix(CommandMode __instance, ref Color __result)
+//    {
+//        __result = new Color(__result.r, 0, 0, 1f);
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(Window), "AddString")]
 public static class WhiteText
@@ -977,7 +1099,7 @@ public static class CompactUI7
     public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
     {
         CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        m_Window.SetSize(GS.StrDot("M") * (WordCountX+1) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
+        m_Window.SetSize(GS.StrDot("M") * (WordCountX+2) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -989,7 +1111,7 @@ public static class CompactUI8
         CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
         int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
         int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
-        m_Window.SetSize(GS.StrDot("M") * (m_WordCountX+1) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
+        m_Window.SetSize(GS.StrDot("M") * (m_WordCountX+2) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
     }
 }
 
@@ -999,7 +1121,7 @@ public static class CursorPosition
     public static void Postfix(ref string[] _array, ref string _name, CommandCursor __instance)
     {
         int num = Array.IndexOf(_array, _name);
-        __instance.commandCursor.SetPos(18, RS3UI.commandY - 3 + num * 26);
+        __instance.commandCursor.SetPos(18, RS3UI.commandY - 1 + num * 26);
     }
 }
 
@@ -1009,7 +1131,7 @@ public static class CursorPosition2
     public static void Postfix(ref string[] _array, ref string _name, CommanderCursor __instance)
     {
         int num = Array.IndexOf(_array, _name);
-        __instance.commandCursor.SetPos(18, RS3UI.commandY - 3 + num * 26);
+        __instance.commandCursor.SetPos(18, RS3UI.commandY - 1 + num * 26);
     }
 }
 
@@ -1022,11 +1144,22 @@ public static class DisableTextScroll
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
         string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
         string[] descriptions = descText.Split('.');
-        HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descriptions[0]+'.');
+        if (descriptions.Length > 1 && descriptions[0].Length > 77)
+        {
+            int space = descText.IndexOf(' ', 66);
+            descriptions[0] = descText.Substring(0, space);
+            descriptions[1] = descText.Substring(space);
+            HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descriptions[0]);
+        }
+        else
+        {
+            descriptions[1] += '.';
+            HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descriptions[0] + '.');
+        }
         GS.m_font_scale_x = 0.6f;
         GS.m_font_scale_y = 0.6f;
         if(descriptions.Length > 1 && descriptions[1].Length > 3)
-            GS.DrawString(descriptions[1]+'.', 172, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+            GS.DrawString(descriptions[1], 172, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
         cVariableWindow.SetPos(155, 462);
     }
     public static void Postfix()
@@ -1062,7 +1195,7 @@ public static class DisableTextScroll2
         GS.m_font_scale_x = 0.6f;
         GS.m_font_scale_y = 0.6f;
 
-        if (descText.Length > 90)
+        if (descText.Length > 80)
         {
             try
             {
@@ -1113,7 +1246,7 @@ public static class DisableTextScroll3
         GS.m_font_scale_x = 0.6f;
         GS.m_font_scale_y = 0.6f;
 
-        if (descText.Length > 90)
+        if (descText.Length > 80)
         {
             try
             {
@@ -1150,11 +1283,14 @@ public static class DisableTextScroll3
 [HarmonyLib.HarmonyPatch(typeof(GS), "DrawStringMenu")]
 public static class TextPosition
 {
-    public static bool Prefix(ref string str, ref int _x, ref int _y, ref int _z, ref Color32 color, ref GS.FontEffect effect)
+    public static bool Prefix(ref string str, ref int _x, ref int _y, ref int _z, ref Color32 color, ref GS.FontEffect effect, ref int base_point_x, ref int base_pont_y, ref float scale)
     {
-        if (RS3UI.windowType == "Command")
+        if (RS3UI.windowType.Contains("Command"))
         {
-            effect = GS.FontEffect.RIM;
+            scale = 1.0f;
+            if(RS3UI.windowType != "CommandSelect")
+                effect = GS.FontEffect.RIM;
+
             if (_x == 465)
                 return false;
             else if (_x >= 573 && _x <= 593)
@@ -1383,15 +1519,17 @@ public static class TextOutline
 {
     public static void Prefix(ref Color32 color, ref GS.FontEffect effect)
     {
+        if (RS3UI.windowType == "CommandSelect")
+            return;
         //if (effect == GS.FontEffect.SHADOW)
         //    effect = GS.FontEffect.RIM;
         if (effect == GS.FontEffect.SHADOW_WINDOW)
             effect = GS.FontEffect.RIM_WINDOW;
-        if(color.r < 50 && effect == GS.FontEffect.RIM)
+        if(color.r < 10 && effect == GS.FontEffect.RIM)
         {
             color = new Color32(255, 255, 255, 255);
         }
-        if(color.r < 50 && effect == GS.FontEffect.CURSOR)
+        if(color.r < 10 && effect == GS.FontEffect.CURSOR)
         {
             color = new Color32(255, 255, 255, color.a);
         }
@@ -1474,6 +1612,7 @@ namespace RS3
         public static int commandY = 83;
         public static int frame = 0;
         public static string replace = "";
+        public static Vector2 rasterparameter = new Vector2(0f,0.02f);
         public override void OnUpdate()
         {
             if(Input.GetKeyDown(KeyCode.F1))
