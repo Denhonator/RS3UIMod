@@ -5,6 +5,7 @@ using static MelonLoader.MelonLogger;
 using System.IO;
 using System;
 using System.Collections.Generic;
+using System.Reflection.Emit;
 
 //[HarmonyLib.HarmonyPatch(typeof(Il2CppMakimono.AnimationDirector), "GetCurrentState", new Type[] { typeof(int) })]
 //class PlayTime
@@ -251,8 +252,8 @@ public static class FPSFixAbiss
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_1);
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_1);
             else
                 yield return code;
         }
@@ -266,8 +267,8 @@ public static class FPSFixd10out
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_1);
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_1);
             else
                 yield return code;
         }
@@ -315,9 +316,9 @@ public static class FPSFixMoveKeepDir
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_8).opcode)
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_8).opcode)
             {
-                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)16);
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)16);
             }
             else
             {
@@ -388,6 +389,45 @@ public static class FPSFixSSOExecter
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "Move")]
+public static class FPSFixBattleMove2
+{
+    public static void Prefix(Vector2 s, Vector2 e, ref int frame, float height, int actchar, BattleEffect __instance)
+    {
+        int[] appear_chmv_cnt = HarmonyLib.Traverse.Create(__instance).Field("appear_chmv_cnt").GetValue<int[]>();
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        {
+            appear_chmv_cnt[actchar]--;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "AppearMove")]
+public static class FPSFixBattleMove
+{
+    public static int[] cnt = new int[6];
+    public static void Prefix(Vector2 s, Vector2 e, ref int frame, float height, int actchar, BattleEffect __instance)
+    {
+        if (actchar == -1)
+            return;
+        frame *= 2;
+        int[] appear_chmv_cnt = HarmonyLib.Traverse.Create(__instance).Field("appear_chmv_cnt").GetValue<int[]>();
+
+        if (appear_chmv_cnt[actchar] == 0 && cnt[actchar] > 2)
+            cnt[actchar] = 0;
+        appear_chmv_cnt[actchar] = cnt[actchar];
+        cnt[actchar]++;
+    }
+
+    public static void Postfix(Vector2 s, Vector2 e, ref int frame, float height, int actchar, BattleEffect __instance, ref bool __result)
+    {
+        if (actchar == -1)
+            return;
+        int[] appear_chmv_cnt = HarmonyLib.Traverse.Create(__instance).Field("appear_chmv_cnt").GetValue<int[]>();
+        appear_chmv_cnt[actchar] = cnt[actchar] / 2;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
 public static class FPSFixBattleEffectStop
 {
@@ -444,8 +484,8 @@ public static class FPSFixFade
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_1);
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_1);
             else
                 yield return code;
         }
@@ -1079,9 +1119,9 @@ public static class TextBoxHeight3
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)35).opcode)
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)35).opcode)
             {
-                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)30);
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)30);
             }
             else
             {
@@ -1268,9 +1308,9 @@ public static class DisableTextScroll2
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_2).opcode)
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
             {
-                yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_3);
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_3);
             }
             else
             {
