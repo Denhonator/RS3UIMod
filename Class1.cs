@@ -395,10 +395,10 @@ public static class FPSFixStay2
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect.SSObject), "Update")]
 public static class FPSFixSSObject
-{   
+{
     public static bool Prefix(SSObject.Anime __instance)
     {
-        if(Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
             return false;
         return true;
     }
@@ -418,14 +418,76 @@ public static class FPSFixSSObject2
 [HarmonyLib.HarmonyPatch(typeof(SSObject), "Update")]
 public static class FPSFixSSObjectSSMovie
 {
-    public static bool Prefix(SSObject __instance)
+    public static void Prefix(SSObject __instance)
     {
-        if (EventUtil.spriteMovieData[0] == null)
-            return true;
-        int curFrame = EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_cur_frame;
-        int endFrame = EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_end_frame;
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && __instance.GetType() == typeof(EventUtil.ScriptSSObject) && curFrame > 0 && endFrame-curFrame > 10)
-            EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_cur_frame--;
+        if (__instance.GetType() == typeof(EventUtil.ScriptSSObject) && EventUtil.spriteMovieData[0] != null)
+        {
+            int curFrame = EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_cur_frame;
+            int endFrame = EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_end_frame;
+            if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && curFrame > 0 && endFrame - curFrame > 10)
+                EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_cur_frame--;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "EffectLoader")]
+public static class FPSFixCmdData
+{
+    public static void Postfix(string filepath, ref string[,] __result)
+    {
+        TextAsset textAsset = Resources.Load(filepath) as TextAsset;
+        string[] array = textAsset.text.Split('\n');
+        int num = array.Length;
+        string[] array2 = array[0].Split(',');
+        string[,] array3 = new string[num, array2.Length*2];
+        for (int i = 0; i < num; i++)
+        {
+            string[] array4 = array[i].Replace(",", ",,").Split(',');
+            for (int j = 0; j < array4.Length; j++)
+            {
+                array3[i, j] = array4[j];
+            }
+        }
+        Resources.UnloadAsset(textAsset);
+        __result = array3;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_pcmodoru")]
+public static class FPSFixAfterActionJump
+{
+    public static bool Prefix(BattleEffect __instance, ref int ___pcmodoru_frame_count)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
+public static class FPSFixExecCmd
+{
+    public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
+    {
+        Msg(cmds + " : " + cmds_arg);
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor")) && !cmds.Contains("calc") && cmds_arg.Contains("_"))
+        {
+            string[] split = cmds_arg.Split('_');
+            if (cmds_arg.StartsWith("me") || cmds_arg.StartsWith("you") || cmds_arg[0]=='0')
+            {
+                int frames = int.Parse(split[1]);
+                split[1] = (frames*2).ToString();
+                string s = "";
+                for(int i = 0; i < split.Length; i++)
+                {
+                    s += split[i];
+                    if (i + 1 < split.Length)
+                        s += "_";
+                }
+                cmds_arg = s;
+                Msg("Modified " + cmds + " to " + cmds_arg);   
+            }
+        }
         return true;
     }
 }
@@ -451,16 +513,16 @@ public static class FPSFixSpecialEff
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
-public static class FPSFixSSOExecter
-{
-    public static bool Prefix(BattleLogic.SSOExecter __instance)
-    {
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-            return false;
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
+//public static class FPSFixSSOExecter
+//{
+//    public static bool Prefix(BattleLogic.SSOExecter __instance)
+//    {
+//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+//            return false;
+//        return true;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "Move")]
 public static class FPSFixBattleMove2
@@ -523,7 +585,7 @@ public static class FPSFixBattleEffectStop
     public static bool Prefix(BattleEffect __instance)
     {
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW || phase == BattleEffect.DISP_PHASE.MOVE_CHAR
+        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW 
                     || phase == BattleEffect.DISP_PHASE.WAIT || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME
                     || phase == BattleEffect.DISP_PHASE.TOTAL_ECLIPSE
                     || phase == BattleEffect.DISP_PHASE.SERVANT_UP || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN;
