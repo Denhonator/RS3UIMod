@@ -6,6 +6,7 @@ using System.IO;
 using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
+using System.Linq;
 
 //[HarmonyLib.HarmonyPatch(typeof(Il2CppMakimono.AnimationDirector), "GetCurrentState", new Type[] { typeof(int) })]
 //class PlayTime
@@ -204,11 +205,41 @@ public static class FPSFixFldObject
 {
     public static bool Prefix(FldObject __instance)
     {
+        //Msg(__instance.m_data_path);
         if (!__instance.m_data_path.Contains("fire"))
             HarmonyLib.Traverse.Create(__instance).Field("m_frame_rate_speed").SetValue(Application.targetFrameRate > 30 ? 1 : 2);
         else if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
             return false;
         return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(FldObject), "LoadEx")]
+public static class FPSFixFldObjectSnow
+{
+    public static void Postfix(FldObject __instance, ref FldObject.FLD_MOTION[] ___m_pmv_mot, ref System.Collections.ArrayList ___m_seq_data)
+    {
+        if (__instance.m_name != null && RS3UI.prints)
+            Msg(__instance.m_name);
+        if (___m_pmv_mot == null || __instance.m_name == null || !__instance.m_name.Contains("snow"))
+            return;
+        //foreach (FldObject.FLD_MOTION mot in ___m_pmv_mot)
+        //{
+        //    foreach (FldObject.FLD_KEY key in mot.key)
+        //    {
+        //        key.frame *= 2;
+        //    }
+        //}
+        foreach (FldObject.FLD_SEQ_DATA seq in ___m_seq_data)
+        {
+            foreach (FldObject.FLD_MOTION mot in seq.grp)
+            {
+                foreach (FldObject.FLD_SEQ_KEY key in mot.key)
+                {
+                    key.shape_id = 0;
+                }
+            }
+        }
     }
 }
 
@@ -233,7 +264,7 @@ public static class FPSFixDialogBlink
     public static void Prefix(ref int method, Window __instance)
     {
         if(method == 1)
-            __instance.m_delta = Mathf.Sign(__instance.m_delta) * Time.deltaTime*3f;
+            __instance.m_delta = Mathf.Sign(__instance.m_delta) * Time.deltaTime*2f;
     }
 }
 
@@ -264,14 +295,14 @@ public static class FPSFixAbiss
 [HarmonyLib.HarmonyPatch(typeof(Field.d10out3Evnet), "Update")]
 public static class FPSFixd10out
 {
-    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    static void Prefix(ref int ___m_timer)
     {
-        foreach (var code in instructions)
+        if(Application.targetFrameRate>30)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_1);
-            else
-                yield return code;
+            if (___m_timer < 30 && ___m_timer > 0 && Time.frameCount % 2 == 0)
+                ___m_timer--;
+            else if (___m_timer >= 30 && GameCore.m_field.m_bg_event_scroll_y < 0)
+                GameCore.m_field.m_bg_event_scroll_y--;
         }
     }
 }
@@ -305,11 +336,22 @@ public static class FPSFixTextFade
         string s = "";
         foreach (string str in array)
             s += str + " ";
-        //Msg(cmd + ": " + s);
+        if(RS3UI.prints)
+            Msg(cmd + ": " + s);
         if (cmd.Contains("textFade") && array.Length > 0)
         {
             array[0] = (int.Parse(array[0]) * 2).ToString();
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "DispatchAction")]
+public static class FPSFixPrint
+{
+    public static void Prefix(ref string currentAction, ActionVM __instance)
+    {
+        if (RS3UI.prints)
+            Msg("ActionVM: " + currentAction);
     }
 }
 
@@ -326,6 +368,18 @@ public static class FPSFixFade
         HarmonyLib.Traverse.Create(typeof(GS)).Field("m_flash_frame").SetValue(Mathf.Max(m_flash_frame - 1, -1));
         int m_whiteout_frame = HarmonyLib.Traverse.Create(typeof(GS)).Field("m_whiteout_frame").GetValue<int>();
         HarmonyLib.Traverse.Create(typeof(GS)).Field("m_whiteout_frame").SetValue(Mathf.Max(m_whiteout_frame - 1, -1));
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect.BattleFader), "Fader")]
+public static class FPSFixFadeBattle
+{
+    public static void Prefix(ref int ___fade_end_frame)
+    {
+        if (___fade_end_frame == 20)
+            ___fade_end_frame = 22;
+        int fade_frame = HarmonyLib.Traverse.Create(typeof(GS)).Field("fade_frame").GetValue<int>();
+        HarmonyLib.Traverse.Create(typeof(GS)).Field("fade_frame").SetValue(fade_frame-1);
     }
 }
 
@@ -437,10 +491,9 @@ public static class FPSFixCmdData
     {
         TextAsset textAsset = Resources.Load(filepath) as TextAsset;
         string[] array = textAsset.text.Split('\n');
-        int num = array.Length;
         string[] array2 = array[0].Split(',');
-        string[,] array3 = new string[num, array2.Length*2];
-        for (int i = 0; i < num; i++)
+        string[,] array3 = new string[array.Length, array2.Length*2-1];
+        for (int i = 0; i < array.Length; i++)
         {
             string[] array4 = array[i].Replace(",", ",,").Split(',');
             for (int j = 0; j < array4.Length; j++)
@@ -467,8 +520,20 @@ public static class FPSFixAfterActionJump
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
+    static string[] halfSpeedFunc = { "gliderspike", "winddart", "dmgskullcrash" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        {
+            foreach(string s in halfSpeedFunc)
+            {
+                if(cmds.Contains(s) && cmds.Contains("calc"))
+                {
+                    Msg("Updating " + cmds + " at half rate");
+                    cmds = "";
+                }
+            }
+        }
         Msg(cmds + " : " + cmds_arg);
         if ((cmds.Contains("mv") || cmds.Contains("moncolor")) && !cmds.Contains("calc") && cmds_arg.Contains("_"))
         {
@@ -491,6 +556,16 @@ public static class FPSFixExecCmd
         return true;
     }
 }
+
+//[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_monswinddart")]
+//public static class FPSFixSpecialEff
+//{
+//    public static void Prefix(BattleEffect __instance, ref int ___mons_winddart_frame_count)
+//    {
+//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+//            ___mons_winddart_frame_count = Mathf.Max(___mons_winddart_frame_count - 1, 0);
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(EventUtil), "UpdateFade")]
 public static class FPSFixUpdateFade
@@ -523,6 +598,16 @@ public static class FPSFixSpecialEff
 //        return true;
 //    }
 //}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "RollingJumpCharacter")]
+public static class FPSFixBattleWinJump
+{
+    public static void Postfix(int actchar, BattleEffect __instance, ref bool __result)
+    {
+        if (__instance._frame_counter < 44)
+            __result = false;
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "Move")]
 public static class FPSFixBattleMove2
@@ -575,6 +660,11 @@ public static class FPSFixBattleMove
             return;
         int[] appear_chmv_cnt = HarmonyLib.Traverse.Create(__instance).Field("appear_chmv_cnt").GetValue<int[]>();
         appear_chmv_cnt[actchar] = cnt[actchar] / 2;
+        if (cnt[actchar] < frame + 12 && cnt[actchar] >= frame)
+        {
+            __instance.m_shape[actchar] = 26;
+            __result = false;
+        }
     }
 }
 
@@ -585,7 +675,7 @@ public static class FPSFixBattleEffectStop
     public static bool Prefix(BattleEffect __instance)
     {
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW 
+        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW
                     || phase == BattleEffect.DISP_PHASE.WAIT || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME
                     || phase == BattleEffect.DISP_PHASE.TOTAL_ECLIPSE
                     || phase == BattleEffect.DISP_PHASE.SERVANT_UP || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN;
@@ -605,16 +695,16 @@ public static class FPSFixBattleEffectStop
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(MoveManager), "update")]
-//public static class FPSFixMoveManager
-//{
-//    public static bool Prefix(MoveManager __instance)
-//    {
-//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-//            return false;
-//        return true;
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "StatusUP")]
+public static class FPSFixGrowSpin
+{
+    public static bool Prefix(BattleEffect __instance)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+            return false;
+        return true;
+    }
+}
 
 [HarmonyLib.HarmonyPatch]
 public static class FPSFixBgFader
@@ -642,14 +732,40 @@ public static class FPSFixBgFader
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "DispatchMap")]
-//public static class FPSFixPrint
-//{
-//    public static void Prefix(ref string cmd, ActionVM __instance)
-//    {
-//        Msg("DispatchMap: " + cmd);
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(Field.ShipMoveEvnet), "Update")]
+public static class FPSFixShip
+{
+    public static void Prefix(Field.ShipMoveEvnet __instance)
+    {
+        if (Application.targetFrameRate > 30)
+        {
+            __instance.m_rad -= 0.1308997f * 0.5f;
+
+            int finalSpeed = 0;
+            if (__instance.m_spd_x+__instance.m_acc_x < 0)
+                __instance.m_spd_x = 0;
+            if ((__instance.m_ascr & 4) != 0)
+                finalSpeed = (__instance.m_spd_x + __instance.m_acc_x) >> 8; //1 for every 256
+            if ((__instance.m_ascr & 8) != 0)
+                finalSpeed = -((__instance.m_spd_x + __instance.m_acc_x) >> 8);
+
+            if (Mathf.Abs(finalSpeed) % 2 == 1 && Time.frameCount % 2 == 0)
+                __instance.m_bg_x -= finalSpeed / Mathf.Abs(finalSpeed);
+            if (Mathf.Abs(finalSpeed) >= 2)
+                __instance.m_bg_x -= finalSpeed / 2;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field.ShipMoveEvnet), "Init")]
+public static class FPSFixShip2
+{
+    public static void Postfix(Field.ShipMoveEvnet __instance)
+    {
+        Field.ShipMoveEvnet shipevent = GameCore.m_field.m_field_event as Field.ShipMoveEvnet;
+        shipevent.m_acc_x /= 2;
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "draw")]
 public static class FPSFixWobble
@@ -753,7 +869,7 @@ public static class FPSFixBattleAnim
 //}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "SpinCharacter")]
-public static class FPSFixSpin
+public static class FPSFixBetweenTurnSpin
 {
     public static bool Prefix(BattleEffect __instance)
     {
@@ -1058,6 +1174,72 @@ public static class FPSFixMovement
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(Image), "reload_texture")]
+public static class ReplaceCharacterTexture
+{
+    public static void Postfix(ref Image __instance)
+    {
+        try
+        {
+            if (__instance.m_name != "alpha" && File.Exists("ReplaceTexture/" + __instance.m_name))
+            {
+                try
+                {
+                    __instance.m_index_tex.LoadImage(File.ReadAllBytes("ReplaceTexture/" + __instance.m_name));
+                    __instance.m_index_tex.Apply(false, false);
+                }
+                catch
+                {
+                    Msg("Failed to replace" + __instance.m_name);
+                }
+            }
+            else if (__instance.m_name != "alpha")
+            {
+                if (!Directory.Exists(Path.GetDirectoryName("Extract/" + __instance.m_name)))
+                    Directory.CreateDirectory(Path.GetDirectoryName("Extract/" + __instance.m_name));
+                File.WriteAllBytes("Extract/" + __instance.m_name, ImageConversion.EncodeToPNG(__instance.m_index_tex));
+            }
+        }
+        catch
+        {
+            Msg("Failed to save " + __instance.m_name);
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Image), "reload_palette")]
+public static class ReplaceCharacterPalette
+{
+    public static void Postfix(ref Image __instance)
+    {
+        try
+        {
+            if (__instance.m_name != "alpha" && File.Exists("ReplaceTexture/" + __instance.m_palette_tex.name+".png"))
+            {
+                try
+                {
+                    __instance.m_palette_tex.LoadImage(File.ReadAllBytes("ReplaceTexture/" + __instance.m_palette_tex.name + ".png"));
+                    __instance.m_palette_tex.Apply(false, false);
+                }
+                catch
+                {
+                    Msg("Failed to replace" + __instance.m_name);
+                }
+            }
+            else if (__instance.m_name != "alpha")
+            {
+                if (!Directory.Exists(Path.GetDirectoryName("Extract/" + __instance.m_palette_tex.name + ".png")))
+                    Directory.CreateDirectory(Path.GetDirectoryName("Extract/" + __instance.m_palette_tex.name + ".png"));
+                File.WriteAllBytes("Extract/" + __instance.m_palette_tex.name + ".png", ImageConversion.EncodeToPNG(__instance.m_palette_tex));
+            }
+        }
+        catch
+        {
+            Msg("Failed to save " + __instance.m_name);
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(Util), "LoadTexture", new Type[] { typeof(string), typeof(byte[]) })]
 public static class ReplaceTexture
 {
@@ -1118,21 +1300,6 @@ public static class ReplaceTexture2
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleArtPointWindow), "Draw", new Type[] { })]
-public static class DisablePointWindow
-{
-    public static bool Prefix(BattleArtPointWindow __instance)
-    {
-        //x 686+   y 28 
-        if (!HarmonyLib.Traverse.Create(__instance).Field("isVisible").GetValue<bool>())
-            return false;
-        int num = HarmonyLib.Traverse.Create(__instance).Field("currentDrawPoint").GetValue<int>();
-        int num2 = HarmonyLib.Traverse.Create(__instance).Field("maxDrawPoint").GetValue<int>();
-        GS.DrawStringMenu(string.Format("{0} / {1}", num, num2), 920, 29, 0, Color.white, GS.FontEffect.RIM, 1, 3, 0.8f);
-        return false;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(BattleCharaNameWindow), "Initialize", new Type[] { })]
 public static class ReplaceTexture3
 {
@@ -1176,6 +1343,21 @@ public static class ReplaceTexture4
         {
             Msg("Failed to load " + path + ": " + e.Message);
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleArtPointWindow), "Draw", new Type[] { })]
+public static class DisablePointWindow
+{
+    public static bool Prefix(BattleArtPointWindow __instance)
+    {
+        //x 686+   y 28 
+        if (!HarmonyLib.Traverse.Create(__instance).Field("isVisible").GetValue<bool>())
+            return false;
+        int num = HarmonyLib.Traverse.Create(__instance).Field("currentDrawPoint").GetValue<int>();
+        int num2 = HarmonyLib.Traverse.Create(__instance).Field("maxDrawPoint").GetValue<int>();
+        GS.DrawStringMenu(string.Format("{0} / {1}", num, num2), 920, 29, 0, Color.white, GS.FontEffect.RIM, 1, 3, 0.8f);
+        return false;
     }
 }
 
@@ -1877,12 +2059,13 @@ namespace RS3
         public static string replace = "";
         public static Vector2 rasterparameter = new Vector2(0f,0.02f);
         public static Action enemyName = null;
+        public static bool prints = false;
 
         public override void OnUpdate()
         {
             if(Input.GetKeyDown(KeyCode.F1))
             {
-                ;
+                prints = !prints;
             }
         }
     }
