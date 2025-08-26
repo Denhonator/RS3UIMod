@@ -189,17 +189,6 @@ public static class FPSFixCharacterAnime
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(MenuObjectCharacter), "Update")]
-public static class FPSFixMenuCharacter
-{
-    public static bool Prefix(MenuManager __instance)
-    {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-            return false;
-        return true;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(FldObject), "Update")]
 public static class FPSFixFldObject
 {
@@ -261,10 +250,41 @@ public static class FPSFixKeyDelay
 [HarmonyLib.HarmonyPatch(typeof(Window), "updateSelectlineAlpha")]
 public static class FPSFixDialogBlink
 {
+    private static Color32[] m_msg_color = new Color32[]
+{
+        new Color32(51, 0, 51, byte.MaxValue),
+        new Color32(0, 0, 0, byte.MaxValue),
+        new Color32(byte.MaxValue, 0, 0, byte.MaxValue),
+        new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue),
+        new Color32(0, byte.MaxValue, byte.MaxValue, byte.MaxValue)
+};
+
     public static void Prefix(ref int method, Window __instance)
     {
-        if(method == 1)
-            __instance.m_delta = Mathf.Sign(__instance.m_delta) * Time.deltaTime*2f;
+        if (method == 1)
+        {
+            __instance.m_delta = Mathf.Sign(__instance.m_delta) * Time.deltaTime * 2f;
+        }
+    }
+
+    public static void Postfix(ref int method, Window __instance, ref int ___m_spr_cursor_x, ref int ___m_spr_cursor_y, ref byte ___m_select_line_alpha)
+    {
+        foreach (Window.DrawText drawText in __instance.m_draw_text)
+        {
+            int type2 = __instance.m_type;
+            Color color;
+            if (__instance.m_type != 1)
+                color = m_msg_color[drawText.m_color];
+            else
+                color = m_msg_color[3];
+            color.a = __instance.m_text_alpha;
+            if (drawText.m_color == 2)
+                color = Color32.Lerp(Color.white, color, ___m_select_line_alpha / 255f);
+            int num = GS.DrawString(drawText.m_str, __instance.m_x + __instance.m_text_x + drawText.m_x, __instance.m_y + __instance.m_text_y + drawText.m_y, 0, color, GS.FontEffect.SHADOW_WINDOW);
+            ___m_spr_cursor_x = num;
+            ___m_spr_cursor_y = __instance.m_y + __instance.m_text_y + drawText.m_y + 20;
+        }
+        __instance.m_draw_text.Clear();
     }
 }
 
@@ -376,8 +396,6 @@ public static class FPSFixFadeBattle
 {
     public static void Prefix(ref int ___fade_end_frame)
     {
-        if (___fade_end_frame == 20)
-            ___fade_end_frame = 22;
         int fade_frame = HarmonyLib.Traverse.Create(typeof(GS)).Field("fade_frame").GetValue<int>();
         HarmonyLib.Traverse.Create(typeof(GS)).Field("fade_frame").SetValue(fade_frame-1);
     }
@@ -419,13 +437,9 @@ public static class FPSFixMoveKeepDir
         foreach (var code in instructions)
         {
             if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_8).opcode)
-            {
                 yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)16);
-            }
             else
-            {
                 yield return code;
-            }
         }
     }
 }
@@ -495,7 +509,7 @@ public static class FPSFixCmdData
         string[,] array3 = new string[array.Length, array2.Length*2-1];
         for (int i = 0; i < array.Length; i++)
         {
-            string[] array4 = array[i].Replace(",", ",,").Split(',');
+            string[] array4 = array[i].Replace(",", ",,").Replace("fadeout:200,,","fadeout:200,").Split(',');
             for (int j = 0; j < array4.Length; j++)
             {
                 array3[i, j] = array4[j];
@@ -668,6 +682,62 @@ public static class FPSFixBattleMove
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(MenuObjectCharacter), "FuncJumpMove")]
+public static class FPSFixMenuFormationJump
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand==20)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)40);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MenuObjectCharacter), "FuncAppearMove")]
+public static class FPSFixMenuFormationAppear
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 15)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)30);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MenuObjectCharacter), "Update")]
+public static class FPSFixMenuWait
+{
+    public enum ANIME_TYPE
+    {
+        JUMP_MOVE,APPEAR_MOVE,GO_LEFT,GO_DOWN,GO_RETURN,TEC_POSE,ARTS_POSE,MASCON_POSE,TITLE_POSE,DASH,NONE
+    }
+    public static bool Prefix(MenuObjectCharacter __instance, ref int ___m_waitCount, ref ANIME_TYPE ___m_animeType)
+    {
+        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+        {
+            if(___m_animeType >= ANIME_TYPE.GO_LEFT || ___m_waitCount > 0)
+                return false;
+        }
+        return true;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
 public static class FPSFixBattleEffectStop
 {
@@ -744,6 +814,8 @@ public static class FPSFixShip
             int finalSpeed = 0;
             if (__instance.m_spd_x+__instance.m_acc_x < 0)
                 __instance.m_spd_x = 0;
+            if (__instance.m_spd_x == 0)
+                return;
             if ((__instance.m_ascr & 4) != 0)
                 finalSpeed = (__instance.m_spd_x + __instance.m_acc_x) >> 8; //1 for every 256
             if ((__instance.m_ascr & 8) != 0)
@@ -753,6 +825,30 @@ public static class FPSFixShip
                 __instance.m_bg_x -= finalSpeed / Mathf.Abs(finalSpeed);
             if (Mathf.Abs(finalSpeed) >= 2)
                 __instance.m_bg_x -= finalSpeed / 2;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field.ShipMoveEvnet_f14), "Update")]
+public static class FPSFixShip3
+{
+    public static void Prefix(Field.ShipMoveEvnet_f14 __instance)
+    {
+        if (Application.targetFrameRate > 30)
+        {
+            __instance.m_rad -= 0.1308997f * 0.5f;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field.ShipMoveEvnet_f14), "Update")]
+public static class FPSFixVanguard
+{
+    public static void Prefix(Field.ShipMoveEvnet_f14 __instance)
+    {
+        if (Application.targetFrameRate > 30)
+        {
+            __instance.m_rad -= 0.08726647f * 0.5f;
         }
     }
 }
@@ -1456,7 +1552,7 @@ public static class TextBoxHeight3
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)35).opcode)
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand==35)
             {
                 yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)30);
             }
@@ -1590,7 +1686,7 @@ public static class CursorPosition
     public static void Postfix(ref string[] _array, ref string _name, CommandCursor __instance)
     {
         int num = Array.IndexOf(_array, _name);
-        __instance.commandCursor.SetPos(18, RS3UI.commandY - 1 + num * 26);
+        __instance.commandCursor.SetPos(18, RS3UI.commandY - 7 + num * 26);
     }
 }
 
@@ -1600,7 +1696,7 @@ public static class CursorPosition2
     public static void Postfix(ref string[] _array, ref string _name, CommanderCursor __instance)
     {
         int num = Array.IndexOf(_array, _name);
-        __instance.commandCursor.SetPos(18, RS3UI.commandY - 1 + num * 26);
+        __instance.commandCursor.SetPos(18, RS3UI.commandY - 7 + num * 26);
     }
 }
 
@@ -1757,6 +1853,7 @@ public static class TextPosition
         if (RS3UI.windowType.Contains("Command"))
         {
             scale = 1.0f;
+
             if (RS3UI.windowType != "CommandSelect")
                 effect = GS.FontEffect.RIM;
 
@@ -1775,6 +1872,11 @@ public static class TextPosition
                 {
                     _y = RS3UI.commandY + 2 + i * 26;
                 }
+            }
+            if (str.Length >= 18)
+            {
+                scale = 0.8f;
+                _y += 1;
             }
         }
         else if (RS3UI.windowType == "PageName")
@@ -1833,6 +1935,40 @@ public static class FormationChooseWindow
         window.SetSize(400, 32);
     }
 }
+
+//[HarmonyLib.HarmonyPatch]
+//public static class FormationMenuUI
+//{
+//    public static System.Reflection.MethodBase TargetMethod()
+//    {
+//        Type type = HarmonyLib.AccessTools.TypeByName("MenuFormation");
+//        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Draw"));
+//    }
+
+//    public static void Prefix()
+//    {
+//        RS3UI.windowType = "Formation";
+//    }
+//}
+
+//[HarmonyLib.HarmonyPatch]
+//public static class FormationMenuUI2
+//{
+//    public static System.Reflection.MethodBase TargetMethod()
+//    {
+//        Type type = HarmonyLib.AccessTools.TypeByName("MenuFormation");
+//        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Initialize"));
+//    }
+
+//    public static void Postfix(ref CVariableWindow[] ___m_window)
+//    {
+//        ___m_window[0].SetPos(55, 20);
+//        ___m_window[0].SetSize(215, 32);
+//        ___m_window[1].SetPos(55, RS3UI.commandY);
+//        ___m_window[1].SetSize(215, 32);
+//        //___m_window[2].SetPos(565, 20);
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleFormationWindow), "Update")]
 public static class FormationChooseWindow2
@@ -1967,7 +2103,9 @@ public static class TextOutline
         //if (effect == GS.FontEffect.SHADOW)
         //    effect = GS.FontEffect.RIM;
         if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0)
+        {
             effect = GS.FontEffect.RIM_WINDOW;
+        }
     }
 }
 
