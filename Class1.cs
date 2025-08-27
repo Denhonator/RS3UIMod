@@ -87,7 +87,7 @@ public static class TrackGameStateChanges
         state == GameCore.State.MENU ? 60 :
         state == GameCore.State.TITLE ? 60 :
         state == GameCore.State.OPENNING ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed) :
-                                        30 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed);
+                                        60 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed);
 
     public static void IncrementCurrentGameStateSpeed()
     {
@@ -1658,6 +1658,25 @@ public static class WhiteText2
     }
 }
 
+[HarmonyLib.HarmonyPatch]
+public static class WhiteTextTrade
+{
+    public static System.Reflection.MethodBase TargetMethod()
+    {
+        Type type = HarmonyLib.AccessTools.FirstInner(typeof(MenuAcquisitionMain), t => t.Name.Contains("ResultWindow"));
+        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Initialize"));
+    }
+
+    public static void Postfix(ref MenuObjectFont ___m_font1, ref MenuObjectFont ___m_font2)
+    {
+        ___m_font1.SetColor(byte.MaxValue, byte.MaxValue, byte.MaxValue);
+        ___m_font2.SetColor(byte.MaxValue, byte.MaxValue, byte.MaxValue);
+        ___m_font1.SetFontEffect(GS.FontEffect.RIM);
+        ___m_font2.SetFontEffect(GS.FontEffect.RIM);
+
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "SetMessageWindowByNPC")]
 public static class TextBoxHeight2
 {
@@ -2060,6 +2079,91 @@ public static class TextPosition2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(TradeBg), "Update")]
+public static class FPSFixTradeBackground
+{
+    public static void Prefix(TradeBg __instance, ref int ___rotateCount, ref Material[] ___m_materialRotateTable)
+    {
+        ___rotateCount = 1;
+        foreach(Material m in ___m_materialRotateTable)
+        {
+            Vector2 moff = m.mainTextureOffset;
+            moff.x -= 0.13333334f * 0.75f;
+            m.mainTextureOffset = moff;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Trade), "Initialize")]
+public static class FPSFixTradeWaitTime
+{
+    public static void Postfix(Trade __instance, ref int ___m_playerWaitTime, ref int ___m_enemyWaitTime)
+    {
+        ___m_enemyWaitTime *= 2;
+        ___m_playerWaitTime *= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Trade), "FuncBehavior")]
+public static class FPSFixTradeBehavior
+{
+    static bool Prefix()
+    {
+        if(Application.targetFrameRate>30 && Time.frameCount % 2 == 0)
+        {
+            return false;
+        }
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(TradeMoneyTower), "Update")]
+public static class FPSFixTradeCoin
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 35f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, (Single)17.5f);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 22f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, (Single)11f);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Trade), "GaugeUpdate")]
+public static class FPSFixTradeGaugeUpdate
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 0.0009f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 0.00045f);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 2f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 1f);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == -2f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, -1f);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Trade), "DateUpdate")]
+public static class FPSFixTradeDate
+{
+    public static bool Prefix()
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            return false;
+        return true;
+    }
+}
+
 namespace MassCombat
 {
     public class MC_wind_work
@@ -2091,7 +2195,7 @@ namespace MassCombat
 }
 
 [HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update_anim")]
-public static class MassCombatAnim
+public static class FPSFixMassCombatAnim
 {
     public static bool Prefix(MassCombat.MCMain __instance)
     {
@@ -2102,7 +2206,7 @@ public static class MassCombatAnim
 }
 
 [HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update")]
-public static class MassCombatUpdate
+public static class FPSFixMassCombatUpdate
 {
     public static bool Prefix(MassCombat.MCMain __instance)
     {
@@ -2125,6 +2229,7 @@ public static class MassCombatWindow
         ___font_max_width = 0;
         int _px = ___windwk[0].x + ___draw_wind_ofs_x;
         int _py = ___windwk[0].y + ___draw_wind_ofs_y;
+        ___windwk[0].h = ___disp_tate * 30;
         int w = ___windwk[0].w;
         int h = ___windwk[0].h;
         if (___wind_touch_rect)
