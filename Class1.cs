@@ -1013,12 +1013,13 @@ public static class FPSFixBetweenTurnSpin
 public static class FPSFixMovement
 {
     static int repeat = 0;
+    static short[] m_jump_kidou = new short[] { 8, 16, 20, 25, 30, 36, 42, 49, 42, 36, 30, 24, 20, 16, 8, 0 };
 
     static bool btst(int a, int b)
     {
         return (a & b) != 0;
     }
-    public static bool Prefix(ref Character ch, Field __instance)
+    public static bool Prefix(ref Character ch, Field __instance, ref short[] ___m_jump_kidou, ref short[] ___m_jump_kidou2)
     {
         if (DebugMenu.m_hide_npc && !ch.IsPlayer())
         {
@@ -1135,17 +1136,17 @@ public static class FPSFixMovement
             {
                 return false;
             }
-            short[] m_jump_kidou = HarmonyLib.Traverse.Create(__instance).Field("m_jump_kidou").GetValue<short[]>();
-            short[] m_jump_kidou2 = HarmonyLib.Traverse.Create(__instance).Field("m_jump_kidou2").GetValue<short[]>();
+            ___m_jump_kidou = m_jump_kidou;
+            ___m_jump_kidou2 = m_jump_kidou;
             System.Reflection.MethodInfo dynMethod = __instance.GetType().GetMethod("test_hit_npc",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-            if (ch.m_jump_cnt > 0 && (Time.frameCount % fpsmult)==0)
+            if (ch.m_jump_cnt > 0)
             {
                 if (m_jump_attr == 8192)
                 {
                     __instance.CharaMove(ch, ch.m_dir, true, false);
-                    ch.m_ofs_y = (int)m_jump_kidou[m_jump_kidou.Length - ch.m_jump_cnt];
+                    ch.m_ofs_y = (int)___m_jump_kidou[___m_jump_kidou.Length - ch.m_jump_cnt];
                     ch.m_jump_cnt--;
                     if (ch.m_jump_cnt == 0)
                     {
@@ -1156,7 +1157,7 @@ public static class FPSFixMovement
                 if (m_jump_attr == 4096)
                 {
                     __instance.CharaMove(ch, ch.m_dir, true, false);
-                    ch.m_ofs_y = (int)m_jump_kidou2[m_jump_kidou2.Length - ch.m_jump_cnt];
+                    ch.m_ofs_y = (int)___m_jump_kidou2[___m_jump_kidou2.Length - ch.m_jump_cnt];
                     ch.m_jump_cnt--;
                     if (ch.m_jump_cnt == 0)
                     {
