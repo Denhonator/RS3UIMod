@@ -2060,6 +2060,122 @@ public static class TextPosition2
     }
 }
 
+namespace MassCombat
+{
+    public class MC_wind_work
+    {
+        public MC_wind_work()
+        {
+            for (int i = 0; i < this.str.Length; i++)
+            {
+                this.str[i] = string.Empty;
+            }
+            for (int j = 0; j < this.font_col.Length; j++)
+            {
+                this.font_col[j] = Color.white;
+            }
+            this.wind[0] = new CVariableWindow();
+            this.wind[1] = new CVariableWindow();
+            this.wind[2] = new CVariableWindow();
+        }
+        public CVariableWindow[] wind = new CVariableWindow[3];
+        public int type_old;
+        public int type;
+        public int x;
+        public int y;
+        public int w;
+        public int h;
+        public string[] str = new string[16];
+        public Color[] font_col = new Color[16];
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update_anim")]
+public static class MassCombatAnim
+{
+    public static bool Prefix(MassCombat.MCMain __instance)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update")]
+public static class MassCombatUpdate
+{
+    public static bool Prefix(MassCombat.MCMain __instance)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "draw_wind")]
+public static class MassCombatWindow
+{
+    public static bool Prefix(MassCombat.MCMain __instance, ref bool ___wind_touch_rect, 
+        ref int ___disp_tate, ref int ___font_max_width, string[] ___font_touch, ref bool ___button_visible,
+        ref int ___draw_wind_ofs_x, ref int ___draw_wind_ofs_y, MassCombat.MC_wind_work[] ___windwk,
+        ref bool ___cursor_visible, ref int ___font_now, ref int ___m_scroll_y, ref Color ___font_hanten,
+        ref int ___font_hanten_flg)
+    {
+        ___button_visible = false;
+        ___font_max_width = 0;
+        int _px = ___windwk[0].x + ___draw_wind_ofs_x;
+        int _py = ___windwk[0].y + ___draw_wind_ofs_y;
+        int w = ___windwk[0].w;
+        int h = ___windwk[0].h;
+        if (___wind_touch_rect)
+        {
+            for (int i = 0; i < ___disp_tate; i++)
+            {
+                InputManager.add_touch_rect(_px, _py + 30 * i, w, 26, ___font_touch[i], true, true, 0);
+            }
+            ___wind_touch_rect = false;
+        }
+        ___windwk[0].wind[___windwk[0].type].SetPos(_px-16, _py-16);
+        ___windwk[0].wind[___windwk[0].type].SetSize(w+32, h+32);
+        if (___font_hanten_flg == 0)
+        {
+            ___font_hanten.b = ___font_hanten.b - Time.deltaTime * 6f;
+            ___font_hanten.g = ___font_hanten.g - Time.deltaTime * 6f;
+            if (___font_hanten.b <= 0f)
+            {
+                ___font_hanten.b = 0f;
+                ___font_hanten.g = 0f;
+                ___font_hanten_flg = 1;
+            }
+        }
+        else
+        {
+            ___font_hanten.b = ___font_hanten.b + Time.deltaTime * 6f;
+            ___font_hanten.g = ___font_hanten.g + Time.deltaTime * 6f;
+            if (___font_hanten.b >= 1f)
+            {
+                ___font_hanten.b = 1f;
+                ___font_hanten.g = 1f;
+                ___font_hanten_flg = 0;
+            }
+        }
+        int num8 = 0;
+        for (int i = 0; i < ___disp_tate; i++)
+        {
+            Color color = ___windwk[0].font_col[i];
+            if (___cursor_visible && ___font_now == i)
+            {
+                color = ___font_hanten;
+            }
+            GS.DrawStringMenu(___windwk[0].str[i], _px+8, ___m_scroll_y + _py + 30 * i, 0, color, GS.FontEffect.RIM, 0, 3, 1f);
+            num8 += ___windwk[0].str[i].Length;
+        }
+        if (num8 > 0)
+            ___windwk[0].wind[___windwk[0].type].Draw(true);
+        return false;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleButtonTri), "Init")]
 public static class HideExtraButtons
 {
