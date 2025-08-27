@@ -242,7 +242,7 @@ public static class FPSFixKeyDelay
         //if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && __instance.virtualFrameCount > 0)
         //    __instance.virtualFrameCount -= 1;
         int keyDelay = HarmonyLib.Traverse.Create(__instance).Field("keyDelay").GetValue<int>();
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30 && keyDelay > 0)
+        if ((Time.frameCount % (Application.targetFrameRate/30)) != 0 && keyDelay > 0)
             HarmonyLib.Traverse.Create(__instance).Field("keyDelay").SetValue(keyDelay + 1);
     }
 }
@@ -285,6 +285,15 @@ public static class FPSFixDialogBlink
             ___m_spr_cursor_y = __instance.m_y + __instance.m_text_y + drawText.m_y + 20;
         }
         __instance.m_draw_text.Clear();
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MenuFlashText), "Update")]
+public static class FPSFixMenuTextBlink
+{
+    public static void Prefix(ref float ___m_addition, Window __instance)
+    {
+        ___m_addition = Mathf.Sign(___m_addition) * Time.deltaTime * 3f;
     }
 }
 
@@ -464,11 +473,24 @@ public static class FPSFixStay2
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect.SSObject), "Update")]
 public static class FPSFixSSObject
 {
-    public static bool Prefix(SSObject.Anime __instance)
+    public static bool Prefix(BattleEffect.SSObject __instance, SSObject ___m_obj)
     {
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-            return false;
+        if (___m_obj != null && ___m_obj.m_anime != null)
+        {
+            SSObject.Anime anime = ___m_obj.m_anime[___m_obj.m_cur_anim_idx];
+            if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && (anime.m_cur_frame >= 0 || anime.m_end_frame <= 0))
+                return false;
+        }
         return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(DetarameYa), "StateArrowCalc")]
+public static class FPSFixRapidVolley
+{
+    public static void Prefix(DetarameYa __instance, ref float ___arrowSpeed)
+    {
+        ___arrowSpeed = 12f * Character.SCALE_X;
     }
 }
 
@@ -555,16 +577,19 @@ public static class FPSFixExecCmd
             if (cmds_arg.StartsWith("me") || cmds_arg.StartsWith("you") || cmds_arg[0]=='0')
             {
                 int frames = int.Parse(split[1]);
-                split[1] = (frames*2).ToString();
-                string s = "";
-                for(int i = 0; i < split.Length; i++)
+                if (frames > 3)
                 {
-                    s += split[i];
-                    if (i + 1 < split.Length)
-                        s += "_";
+                    split[1] = (frames * 2).ToString();
+                    string s = "";
+                    for (int i = 0; i < split.Length; i++)
+                    {
+                        s += split[i];
+                        if (i + 1 < split.Length)
+                            s += "_";
+                    }
+                    cmds_arg = s;
+                    Msg("Modified " + cmds + " to " + cmds_arg);
                 }
-                cmds_arg = s;
-                Msg("Modified " + cmds + " to " + cmds_arg);   
             }
         }
         return true;
@@ -679,6 +704,15 @@ public static class FPSFixBattleMove
             __instance.m_shape[actchar] = 26;
             __result = false;
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_hermite_move")]
+public static class FPSFixEnemyAppear
+{
+    public static void Prefix(ref int frame)
+    {
+        frame *= 2;
     }
 }
 
@@ -1564,21 +1598,31 @@ public static class TextBoxHeight3
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize_English")]
+[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "GetWordWith_English")]
 public static class CompactUI
 {
-    public static void Postfix(ref string Message, CVariableMessagePlus __instance)
+    public static void Postfix(ref int __result)
     {
-        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
-        int m_WindowSizeX = 0;
-        foreach (string text in __instance.m_Message)
-        {
-            if (m_WindowSizeX < GS.StrDot(text))
-                m_WindowSizeX = GS.StrDot(text);
-        }
-        int m_WindowSizeY = GS.StrDot("M") * (m_WordCountY + 1);
-        m_Window.SetSize(Mathf.Max(m_WindowSizeX+8, 80), m_WindowSizeY);
+        __result = Mathf.Max(__result, 80);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Utility_T_H.BattleMess), "GetMessageSizeX")]
+public static class CompactUIBattleMess
+{
+    public static void Postfix(ref int __result)
+    {
+        __result = Mathf.Max(__result, 100);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Utility_T_H.BattleMess), "DrawWait")]
+public static class FPSFixBattleMess
+{
+    public static void Prefix(ref int ____wait_counter)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            ____wait_counter--;
     }
 }
 
@@ -1658,27 +1702,39 @@ public static class CompactUI6
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { typeof(int),typeof(int) })]
+[HarmonyLib.HarmonyPatch(typeof(VariableWindowManager), "SetMessagePlus", new Type[] { typeof(int), typeof(int),typeof(int),typeof(int),typeof(int),typeof(string) })]
 public static class CompactUI7
 {
-    public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
+    public static void Prefix(ref int WordCountX, ref int WordCountY, ref string mess)
     {
-        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(WordCountX,10) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
+        string[] lines = mess.Split('\n');
+        WordCountX = lines[0].Length / 2;
+        if(lines.Length>1 && lines[1].Length / 2 > WordCountX)
+            WordCountX = lines[1].Length / 2;
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { })]
-public static class CompactUI8
-{
-    public static void Postfix(ref CVariableMessagePlus __instance)
-    {
-        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
-        int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
-        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(m_WordCountX, 10) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { typeof(int),typeof(int) })]
+//public static class CompactUI7
+//{
+//    public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
+//    {
+//        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
+//        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(WordCountX,10) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
+//    }
+//}
+
+//[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { })]
+//public static class CompactUI8
+//{
+//    public static void Postfix(ref CVariableMessagePlus __instance)
+//    {
+//        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
+//        int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
+//        int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
+//        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(m_WordCountX, 10) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(CommandCursor), "SetCursor", new Type[] { typeof(string[]), typeof(string) })]
 public static class CursorPosition
@@ -2157,7 +2213,7 @@ public static class FontChange
         GS.m_shadow_mtl[(int)type].renderQueue = 6000;
         GS.m_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 128);
         GS.m_rim_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
-        GS.m_rim_mtl[(int)type].color = new Color32(0, 0, 0, 128);
+        GS.m_rim_mtl[(int)type].color = new Color32(0, 0, 0, byte.MaxValue);
         ShaderUtil.SetDepthTest(GS.m_rim_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
         GS.m_rim_mtl[(int)type].renderQueue = 6000;
         GS.m_font_mtl_w[(int)type] = new Material(GS.m_font_mtl[(int)type]);
@@ -2201,6 +2257,7 @@ namespace RS3
 
         public override void OnUpdate()
         {
+            Sys.frametime = (int)(Time.deltaTime*1000);
             if(Input.GetKeyDown(KeyCode.F1))
             {
                 prints = !prints;
