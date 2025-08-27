@@ -208,7 +208,7 @@ public static class FPSFixFldObjectSnow
 {
     public static void Postfix(FldObject __instance, ref FldObject.FLD_MOTION[] ___m_pmv_mot, ref System.Collections.ArrayList ___m_seq_data)
     {
-        if (__instance.m_name != null && RS3UI.prints)
+        if (__instance.m_name != null && RS3UI.prints > 1)
             Msg(__instance.m_name);
         if (___m_pmv_mot == null || __instance.m_name == null || !__instance.m_name.Contains("snow"))
             return;
@@ -353,6 +353,10 @@ public static class FPSFixWait2
             int w = HexStringToInt(array[0].Substring(1)) * 2;
             array[0] = "$" + w.ToString("X");
         }
+        else if (array[0][0] >= '0' && array[0][0] <= '9')
+        {
+            array[0] = (int.Parse(array[0]) * 2).ToString();
+        }
     }
 }
 
@@ -365,7 +369,7 @@ public static class FPSFixTextFade
         string s = "";
         foreach (string str in array)
             s += str + " ";
-        if(RS3UI.prints)
+        if(RS3UI.prints > 1)
             Msg(cmd + ": " + s);
         if (cmd.Contains("textFade") && array.Length > 0)
         {
@@ -379,7 +383,7 @@ public static class FPSFixPrint
 {
     public static void Prefix(ref string currentAction, ActionVM __instance)
     {
-        if (RS3UI.prints)
+        if (RS3UI.prints > 1)
             Msg("ActionVM: " + currentAction);
     }
 }
@@ -510,12 +514,12 @@ public static class FPSFixSSObjectSSMovie
 {
     public static void Prefix(SSObject __instance)
     {
-        if (__instance.GetType() == typeof(EventUtil.ScriptSSObject) && EventUtil.spriteMovieData[0] != null)
+        if (__instance.GetType() == typeof(EventUtil.ScriptSSObject) &&
+            Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
         {
-            int curFrame = EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_cur_frame;
-            int endFrame = EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_end_frame;
-            if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && curFrame > 0 && endFrame - curFrame > 10)
-                EventUtil.spriteMovieData[0].m_anime[EventUtil.spriteMovieData[0].m_cur_anim_idx].m_cur_frame--;
+            SSObject.Anime anime = __instance.m_anime[__instance.m_cur_anim_idx];
+            if (anime.m_cur_frame > 0 && anime.m_end_frame - anime.m_cur_frame > 10)
+                anime.m_cur_frame--;
         }
     }
 }
@@ -553,10 +557,74 @@ public static class FPSFixAfterActionJump
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_monswinddart")]
+public static class FPSFixWindDart
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)12);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_7).opcode)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)14);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_mons_shippo_calc")]
+public static class FPSFixTailSwipe
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_8).opcode)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)19);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand==9)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)18);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "tgt_dmg_calc")]
+public static class FPSFixTailSwipe2
+{
+    static bool Prefix(ref bool __result)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        {
+            __result = false;
+            return false;
+        }
+        return true;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "gliderspike", "winddart", "dmgskullcrash" };
+    static string[] halfSpeedFunc = { "gliderspike", "dmgskullcrash" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -565,31 +633,40 @@ public static class FPSFixExecCmd
             {
                 if(cmds.Contains(s) && cmds.Contains("calc"))
                 {
-                    Msg("Updating " + cmds + " at half rate");
+                    if (RS3UI.prints > 0)
+                        Msg("Updating " + cmds + " at half rate");
                     cmds = "";
+                    __result = false;
+                    return false;
                 }
             }
         }
-        Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor")) && !cmds.Contains("calc") && cmds_arg.Contains("_"))
+        if (RS3UI.prints > 0)
+            Msg(cmds + " : " + cmds_arg);
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="pal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds_arg.Contains("_"))
         {
             string[] split = cmds_arg.Split('_');
-            if (cmds_arg.StartsWith("me") || cmds_arg.StartsWith("you") || cmds_arg[0]=='0')
+            int frameIndex = (cmds.Contains("moncolor") || cmds=="giant") ? 0 :
+                            cmds== "forcesetframe" ? 3 : 1;
+            if (frameIndex < 0)
+                return true;
+
+            int frames = int.Parse(split[frameIndex]);
+            if (frames > 1)
             {
-                int frames = int.Parse(split[1]);
-                if (frames > 3)
+                if (frameIndex==1 && split.Length>2 && split[0][0] >= '0' && split[0][0] <= '9')
+                    split[0] = (int.Parse(split[0]) * 2).ToString();
+                split[frameIndex] = (frames*2).ToString();
+                string s = "";
+                for (int i = 0; i < split.Length; i++)
                 {
-                    split[1] = (frames * 2).ToString();
-                    string s = "";
-                    for (int i = 0; i < split.Length; i++)
-                    {
-                        s += split[i];
-                        if (i + 1 < split.Length)
-                            s += "_";
-                    }
-                    cmds_arg = s;
-                    Msg("Modified " + cmds + " to " + cmds_arg);
+                    s += split[i];
+                    if (i + 1 < split.Length)
+                        s += "_";
                 }
+                cmds_arg = s;
+                if (RS3UI.prints > 0)
+                    Msg("Modified " + cmds + " to " + cmds_arg);
             }
         }
         return true;
@@ -894,6 +971,20 @@ public static class FPSFixShip2
     {
         Field.ShipMoveEvnet shipevent = GameCore.m_field.m_field_event as Field.ShipMoveEvnet;
         shipevent.m_acc_x /= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_shake")]
+public static class FPSFixShake
+{
+    public static void Prefix(ref string[] ___currentParameter, ScriptDrive __instance)
+    {
+        ___currentParameter[0] = ___currentParameter[0].Replace("midium", "medium");
+    }
+
+    public static void Postfix(ScriptDrive __instance)
+    {
+        __instance.shakeInterval *= 2;
     }
 }
 
@@ -2254,14 +2345,14 @@ namespace RS3
         public static string replace = "";
         public static Vector2 rasterparameter = new Vector2(0f,0.02f);
         public static Action enemyName = null;
-        public static bool prints = false;
+        public static int prints = 0;
 
         public override void OnUpdate()
         {
             Sys.frametime = (int)(Time.deltaTime*1000);
             if(Input.GetKeyDown(KeyCode.F1))
             {
-                prints = !prints;
+                prints = (prints + 1) % 3;
             }
         }
     }
