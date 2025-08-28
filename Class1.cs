@@ -375,6 +375,10 @@ public static class FPSFixTextFade
         {
             array[0] = (int.Parse(array[0]) * 2).ToString();
         }
+        if(cmd.Contains("ssMovie") && array.Length > 3 && array[2] == "zoomframe")
+        {
+            array[3] = (int.Parse(array[3]) * 2).ToString();
+        }
     }
 }
 
@@ -646,9 +650,9 @@ public static class FPSFixExecCmd
         if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="pal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds_arg.Contains("_"))
         {
             string[] split = cmds_arg.Split('_');
-            int frameIndex = (cmds.Contains("moncolor") || cmds=="giant") ? 0 :
+            int frameIndex = (cmds=="giant") ? 0 :
                             cmds== "forcesetframe" ? 3 : 1;
-            if (frameIndex < 0)
+            if (frameIndex < 0 || split[frameIndex][0]>'9')
                 return true;
 
             int frames = int.Parse(split[frameIndex]);
@@ -693,13 +697,22 @@ public static class FPSFixUpdateFade
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "draw")]
+[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update")]
 public static class FPSFixSpecialEff
 {
-    public static bool Prefix(SpecialEffMonster __instance)
+    static float lastInv = 0f;
+    public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, ref Action ____update_ptn)
     {
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        if(____inv_time != lastInv && Application.targetFrameRate > 30)
+        {
+            ____inv_time *= 0.5f;
+            lastInv = ____inv_time;
+        }
+        if(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+        {
+            ____update_ptn();
             return false;
+        }
         return true;
     }
 }
@@ -790,6 +803,34 @@ public static class FPSFixEnemyAppear
     public static void Prefix(ref int frame)
     {
         frame *= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_wait")]
+public static class FPSFixEnemyAppear2
+{
+    public static void Prefix(ref int frame)
+    {
+        frame *= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Shake), "setup")]
+public static class FPSFixShake
+{
+    public static void Prefix(ref int frame)
+    {
+        frame *= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_frame_act")]
+public static class FPSFixFrameAction
+{
+    public static void Prefix(ref FrameAction fa)
+    {
+        if(fa._frame>1)
+            fa._frame *= 2;
     }
 }
 
@@ -896,20 +937,10 @@ public static class FPSFixBgFader
         return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("UpdateBgFader"));
     }
 
-    public static void Prefix()
+    public static void Prefix(ref int ___bgFadeFrame)
     {
         Msg("BgFader");
-    }
-
-    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
-    {
-        foreach (var code in instructions)
-        {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_1);
-            else
-                yield return code;
-        }
+        ___bgFadeFrame--;
     }
 }
 
@@ -975,7 +1006,7 @@ public static class FPSFixShip2
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_shake")]
-public static class FPSFixShake
+public static class FPSFixShakeCutscene
 {
     public static void Prefix(ref string[] ___currentParameter, ScriptDrive __instance)
     {
