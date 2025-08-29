@@ -291,7 +291,7 @@ public static class FPSFixDialogBlink
 [HarmonyLib.HarmonyPatch(typeof(MenuFlashText), "Update")]
 public static class FPSFixMenuTextBlink
 {
-    public static void Prefix(ref float ___m_addition, Window __instance)
+    public static void Prefix(ref float ___m_addition, MenuFlashText __instance)
     {
         ___m_addition = Mathf.Sign(___m_addition) * Time.deltaTime * 3f;
     }
@@ -1617,47 +1617,47 @@ public static class DisablePointWindow
 [HarmonyLib.HarmonyPatch(typeof(BattleResetWindow), "StringColorUpdate")]
 public static class TextFlashingResetWindow
 {
-    public static void Prefix(BattleResetWindow __instance)
+    public static void Prefix(BattleResetWindow __instance, ref float ___strColorAdd, ref float ___strColor)
     {
-        float strColorAdd = HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").GetValue<float>();
-        float strColor = HarmonyLib.Traverse.Create(__instance).Field("strColor").GetValue<float>();
-        HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").SetValue(Mathf.Sign(strColorAdd) * 0.1f / (Application.targetFrameRate / 30f));
+        if (___strColor <= 0.3f)
+            ___strColorAdd = 1f;
+        ___strColorAdd = Mathf.Sign(___strColorAdd) * Time.deltaTime * 2.5f;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(SarahCommander), "StrFlashingUpdate")]
 public static class TextFlashingSarah
 {
-    public static void Prefix(CommandMode __instance)
+    public static void Prefix(SarahCommander __instance, ref float ___strColorAdd, ref float ___strColor)
     {
         RS3UI.windowType = "CommandSelect";
-        float strColorAdd = HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").GetValue<float>();
-        float strColor = HarmonyLib.Traverse.Create(__instance).Field("strColor").GetValue<float>();
-        HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").SetValue(Mathf.Sign(strColorAdd) * 0.1f / (Application.targetFrameRate / 30f));
+        if (___strColor <= 0.3f)
+            ___strColorAdd = 1f;
+        ___strColorAdd = Mathf.Sign(___strColorAdd) * Time.deltaTime * 2.5f;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommandMode), "StrFlashingUpdate")]
 public static class TextFlashingCommand
 {
-    public static void Prefix(CommandMode __instance)
+    public static void Prefix(CommandMode __instance, ref float ___strColorAdd, ref float ___strColor)
     {
         RS3UI.windowType = "CommandSelect";
-        float strColorAdd = HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").GetValue<float>();
-        float strColor = HarmonyLib.Traverse.Create(__instance).Field("strColor").GetValue<float>();
-        HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").SetValue(Mathf.Sign(strColorAdd) * 0.1f / (Application.targetFrameRate / 30f));
+        if (___strColor <= 0.3f)
+            ___strColorAdd = 1f;
+        ___strColorAdd = Mathf.Sign(___strColorAdd) * Time.deltaTime * 2.5f;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommanderMode), "StrFlashingUpdate")]
 public static class TextFlashingCommander
 {
-    public static void Prefix(CommandMode __instance)
+    public static void Prefix(CommanderMode __instance, ref float ___strColorAdd, ref float ___strColor)
     {
         RS3UI.windowType = "CommandSelect";
-        float strColorAdd = HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").GetValue<float>();
-        float strColor = HarmonyLib.Traverse.Create(__instance).Field("strColor").GetValue<float>();
-        HarmonyLib.Traverse.Create(__instance).Field("strColorAdd").SetValue(Mathf.Sign(strColorAdd) * 0.1f / (Application.targetFrameRate / 30f));
+        if (___strColor <= 0.3f)
+            ___strColorAdd = 1f;
+        ___strColorAdd = Mathf.Sign(___strColorAdd) * Time.deltaTime * 2.5f;
     }
 }
 
@@ -1714,6 +1714,7 @@ public static class TextBoxHeight2
     public static void Prefix(ref int id, ref int mapinfoNpcNo, ref int dotwidth, ref int row, ref ScriptDrive __instance)
     {
         __instance.messageWindow[id].lowerMargin = -row * 5;
+        __instance.messageWindow[id].upperMargin = 0;
     }
 }
 
@@ -1722,7 +1723,7 @@ public static class TextBoxHeight3
 {
     public static void Prefix(ref int element, ref int px, ref int py, ref int width)
     {
-        py -= 5;
+        py -= 15;
     }
     static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
     {
@@ -1828,7 +1829,7 @@ public static class CompactUI3
         CommandPageNameWindow commandPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("commandPageNameWindow").GetValue<CommandPageNameWindow>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(commandPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
-        cVariableWindow.SetSize(180, 32);
+        cVariableWindow.SetSize(270, 32);
     }
 }
 
@@ -1901,71 +1902,25 @@ public static class CursorPosition2
 [HarmonyLib.HarmonyPatch(typeof(CommandDescText), "DescTextUpdate", new Type[] {})]
 public static class DisableTextScroll
 {
-    public static void Prefix(CommandDescText __instance)
-    {
-        HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
-        CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
-        string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
-        string[] descriptions = descText.Split('.');
-        if (descriptions.Length > 1 && descriptions[0].Length > 77)
-        {
-            int space = descText.IndexOf(' ', 66);
-            descriptions[0] = descText.Substring(0, space);
-            descriptions[1] = descText.Substring(space);
-            HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descriptions[0]);
-        }
-        else
-        {
-            descriptions[1] += '.';
-            HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descriptions[0] + '.');
-        }
-        GS.m_font_scale_x = 0.6f;
-        GS.m_font_scale_y = 0.6f;
-        if(descriptions.Length > 1 && descriptions[1].Length > 3)
-            GS.DrawString(descriptions[1], 172, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
-        cVariableWindow.SetPos(155, 462);
-    }
-    public static void Postfix()
-    {
-        GS.m_font_scale_x = 1f;
-        GS.m_font_scale_y = 1f;
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommanderDescText), "DescTextUpdate", new Type[] { })]
-public static class DisableTextScroll2
-{
-    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
-    {
-        foreach (var code in instructions)
-        {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
-            {
-                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_3);
-            }
-            else
-            {
-                yield return code;
-            }
-        }
-    }
-
-    public static void Prefix(CommanderDescText __instance)
+    public static bool Prefix(CommandDescText __instance)
     {
         HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
         string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
         string line2 = "";
-        GS.m_font_scale_x = 0.6f;
-        GS.m_font_scale_y = 0.6f;
+        GS.m_font_scale_x = 0.65f;
+        GS.m_font_scale_y = 0.65f;
+        CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
+        cVariableWindow.SetPos(155, 463);
+        GS.FillRectZ(160, 462, 4000, 646, 55, 0.5f);
 
-        if (descText.Length > 80)
+        if (descText.Length > 70)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5)
+                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < 70)
                 {
                     line2 = descText.Substring(descText.IndexOf('.') + 2);
-                    descText = descText.Substring(0, descText.IndexOf('.')+1);
+                    descText = descText.Substring(0, descText.IndexOf('.') + 1);
                 }
                 else
                 {
@@ -1975,45 +1930,91 @@ public static class DisableTextScroll2
                 HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
                 if (line2 != "")
                 {
-                    GS.DrawString(line2, 172, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
                 }
-                CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
-                cVariableWindow.SetPos(155, 462);
             }
             catch
             {
                 ;
             }
         }
-    }
-    public static void Postfix()
-    {
+        GS.DrawString(descText, 175, 475, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
         GS.m_font_scale_x = 1f;
         GS.m_font_scale_y = 1f;
+        return false;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(CommanderDescText), "DescTextUpdate", new Type[] { })]
+public static class DisableTextScroll2
+{
+    public static bool Prefix(CommanderDescText __instance)
+    {
+        HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
+        string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
+        string line2 = "";
+        GS.m_font_scale_x = 0.65f;
+        GS.m_font_scale_y = 0.65f;
+        CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
+        cVariableWindow.SetPos(155, 463);
+        GS.FillRectZ(160, 462, 4000, 646, 55, 0.5f);
+
+        if (descText.Length > 70)
+        {
+            try
+            {
+                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < 70)
+                {
+                    line2 = descText.Substring(descText.IndexOf('.') + 2);
+                    descText = descText.Substring(0, descText.IndexOf('.') + 1);
+                }
+                else
+                {
+                    line2 = descText.Substring(descText.LastIndexOf(' ', 70) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(' ', 70));
+                }
+                HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
+                if (line2 != "")
+                {
+                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+                }
+            }
+            catch
+            {
+                ;
+            }
+        }
+        GS.DrawString(descText, 175, 475, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+        GS.m_font_scale_x = 1f;
+        GS.m_font_scale_y = 1f;
+        return false;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ScrollMessage), "Update", new Type[] { })]
 public static class DisableTextScroll3
 {
-    static string prevString = "";
-    public static void Prefix(ScrollMessage __instance)
+    public static bool Prefix(ScrollMessage __instance)
     {
         if (!HarmonyLib.Traverse.Create(__instance).Field("m_isvisible").GetValue<bool>())
-            return;
+            return false;
 
         __instance.ScrollReset();
         string descText = HarmonyLib.Traverse.Create(__instance).Field("m_Messgae").GetValue<string>();
-        prevString = descText;
         string line2 = "";
-        GS.m_font_scale_x = 0.6f;
-        GS.m_font_scale_y = 0.6f;
+        GS.m_font_scale_x = 0.65f;
+        GS.m_font_scale_y = 0.65f;
+        CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
+        cVariableWindow.SetPos(155, 463);
+        cVariableWindow.SetSize(650, 64);
+        cVariableWindow.Draw(false);
+        GS.FillRectZ(160, 462, 4000, 646, 55, 0.5f);
 
-        if (descText.Length > 80)
+        if (descText.Length > 70)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5)
+                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < 70)
                 {
                     line2 = descText.Substring(descText.IndexOf('.') + 2);
                     descText = descText.Substring(0, descText.IndexOf('.') + 1);
@@ -2025,7 +2026,6 @@ public static class DisableTextScroll3
                 }
                 if (line2 != "")
                 {
-                    __instance.SetMessgae(descText);
                     GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.RIM);
                 }
             }
@@ -2034,12 +2034,10 @@ public static class DisableTextScroll3
                 ;
             }
         }
-    }
-    public static void Postfix(ScrollMessage __instance)
-    {
+        GS.DrawString(descText, 175, 475, 0, Color.white, GS.FontEffect.RIM);
         GS.m_font_scale_x = 1f;
         GS.m_font_scale_y = 1f;
-        __instance.SetMessgae(prevString);
+        return false;
     }
 }
 
@@ -2351,24 +2349,27 @@ public static class FormationChooseWindow
 //    }
 //}
 
-//[HarmonyLib.HarmonyPatch]
-//public static class FormationMenuUI2
-//{
-//    public static System.Reflection.MethodBase TargetMethod()
-//    {
-//        Type type = HarmonyLib.AccessTools.TypeByName("MenuFormation");
-//        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Initialize"));
-//    }
+[HarmonyLib.HarmonyPatch]
+public static class FormationMenuUI2
+{
+    public static System.Reflection.MethodBase TargetMethod()
+    {
+        Type type = HarmonyLib.AccessTools.TypeByName("MenuFormation");
+        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Initialize"));
+    }
 
-//    public static void Postfix(ref CVariableWindow[] ___m_window)
-//    {
-//        ___m_window[0].SetPos(55, 20);
-//        ___m_window[0].SetSize(215, 32);
-//        ___m_window[1].SetPos(55, RS3UI.commandY);
-//        ___m_window[1].SetSize(215, 32);
-//        //___m_window[2].SetPos(565, 20);
-//    }
-//}
+    public static void Postfix(ref CVariableWindow[] ___m_window, ref string[] ___MenuTouchList, ref MenuBase __instance, ref MenuFlashText ___m_flashText)
+    {
+        //___m_window[0].SetPos(55, 20);
+        //___m_window[0].SetSize(215, 32);
+        //___m_window[1].SetPos(55, RS3UI.commandY);
+        //___m_window[1].SetSize(215, 32);
+        //___m_window[2].SetPos(565, 20);
+        foreach(string s in ___MenuTouchList)
+            __instance.GetMenuObjectFont(s).SetFontEffect(GS.FontEffect.RIM);
+        ___m_flashText.SetFlashColor(0.3f, 0.3f, 0.3f);
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleFormationWindow), "Update")]
 public static class FormationChooseWindow2
@@ -2498,6 +2499,9 @@ public static class TextOutline
 {
     public static void Prefix(ref Color32 color, ref GS.FontEffect effect)
     {
+        //GS.FontSize = 60f;
+        //GS.m_font_scale_x = 2f;
+        //GS.m_font_scale_y = 2f;
         if (RS3UI.windowType == "CommandSelect")
             return;
         //if (effect == GS.FontEffect.SHADOW)
@@ -2550,6 +2554,7 @@ public static class FontChange
         GS.m_font_mtl[(int)type] = ShaderUtil.CreateMaterial(ShaderUtil.Type.FONT);
         GS.m_font_mtl[(int)type].mainTexture = GS.m_font[(int)type].material.mainTexture;
         GS.m_font_mtl[(int)type].color = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
+        //GS.m_font_mtl[(int)type].mainTexture.filterMode = FilterMode.Point;
         GS.m_font_mtl[(int)type].renderQueue = 6001;
         ShaderUtil.SetDepthTest(GS.m_font_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
         GS.m_shadow_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
