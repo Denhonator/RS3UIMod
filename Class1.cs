@@ -540,9 +540,9 @@ public static class FPSFixCmdData
         for (int i = 0; i < array.Length; i++)
         {
             string[] array4 = array[i].Replace(",", ",,").Replace("fadeout:200,,","fadeout:200,").Split(',');
-            for (int j = 0; j < array4.Length; j++)
+            for (int j = 0; j < array3.GetLength(1); j++)
             {
-                array3[i, j] = array4[j];
+                array3[i, j] = array4.Length > j ? array4[j] : "";
             }
         }
         Resources.UnloadAsset(textAsset);
@@ -1910,27 +1910,28 @@ public static class DisableTextScroll
         GS.m_font_scale_x = 0.65f;
         GS.m_font_scale_y = 0.65f;
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
-        cVariableWindow.SetPos(155, 463);
-        GS.FillRectZ(160, 462, 4000, 646, 55, 0.5f);
+        cVariableWindow.SetPos(105, 463);
+        cVariableWindow.SetSize(750, 64);
+        GS.FillRectZ(110, 462, 4000, 746, 55, 0.5f);
 
-        if (descText.Length > 70)
+        if (descText.Length > RS3UI.descLineLen)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < 70)
+                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < RS3UI.descLineLen)
                 {
                     line2 = descText.Substring(descText.IndexOf('.') + 2);
                     descText = descText.Substring(0, descText.IndexOf('.') + 1);
                 }
                 else
                 {
-                    line2 = descText.Substring(descText.LastIndexOf(' ', 70) + 1);
-                    descText = descText.Substring(0, descText.LastIndexOf(' ', 70));
+                    line2 = descText.Substring(descText.LastIndexOf(' ', RS3UI.descLineLen) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(' ', RS3UI.descLineLen));
                 }
                 HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
                 if (line2 != "")
                 {
-                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+                    GS.DrawString(line2, 125, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
                 }
             }
             catch
@@ -1938,7 +1939,7 @@ public static class DisableTextScroll
                 ;
             }
         }
-        GS.DrawString(descText, 175, 475, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+        GS.DrawString(descText, 125, 475, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
         GS.m_font_scale_x = 1f;
         GS.m_font_scale_y = 1f;
         return false;
@@ -1956,27 +1957,28 @@ public static class DisableTextScroll2
         GS.m_font_scale_x = 0.65f;
         GS.m_font_scale_y = 0.65f;
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
-        cVariableWindow.SetPos(155, 463);
-        GS.FillRectZ(160, 462, 4000, 646, 55, 0.5f);
+        cVariableWindow.SetPos(105, 463);
+        cVariableWindow.SetSize(750, 64);
+        GS.FillRectZ(110, 462, 4000, 746, 55, 0.5f);
 
-        if (descText.Length > 70)
+        if (descText.Length > RS3UI.descLineLen)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < 70)
+                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < RS3UI.descLineLen)
                 {
                     line2 = descText.Substring(descText.IndexOf('.') + 2);
                     descText = descText.Substring(0, descText.IndexOf('.') + 1);
                 }
                 else
                 {
-                    line2 = descText.Substring(descText.LastIndexOf(' ', 70) + 1);
-                    descText = descText.Substring(0, descText.LastIndexOf(' ', 70));
+                    line2 = descText.Substring(descText.LastIndexOf(' ', RS3UI.descLineLen) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(' ', RS3UI.descLineLen));
                 }
                 HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
                 if (line2 != "")
                 {
-                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+                    GS.DrawString(line2, 125, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
                 }
             }
             catch
@@ -1984,7 +1986,7 @@ public static class DisableTextScroll2
                 ;
             }
         }
-        GS.DrawString(descText, 175, 475, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
+        GS.DrawString(descText, 125, 475, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
         GS.m_font_scale_x = 1f;
         GS.m_font_scale_y = 1f;
         return false;
@@ -2005,28 +2007,28 @@ public static class DisableTextScroll3
         GS.m_font_scale_x = 0.65f;
         GS.m_font_scale_y = 0.65f;
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-        cVariableWindow.SetPos(155, 463);
-        cVariableWindow.SetSize(650, 64);
+        cVariableWindow.SetPos(105, 463);
+        cVariableWindow.SetSize(750, 64);
         cVariableWindow.Draw(false);
-        GS.FillRectZ(160, 462, 4000, 646, 55, 0.5f);
+        GS.FillRectZ(110, 462, 4000, 746, 55, 0.5f);
 
-        if (descText.Length > 70)
+        if (descText.Length > RS3UI.descLineLen)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < 70)
+                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < RS3UI.descLineLen)
                 {
                     line2 = descText.Substring(descText.IndexOf('.') + 2);
                     descText = descText.Substring(0, descText.IndexOf('.') + 1);
                 }
                 else
                 {
-                    line2 = descText.Substring(descText.LastIndexOf(' ', 70) + 1);
-                    descText = descText.Substring(0, descText.LastIndexOf(' ', 70));
+                    line2 = descText.Substring(descText.LastIndexOf(' ', RS3UI.descLineLen) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(' ', RS3UI.descLineLen));
                 }
                 if (line2 != "")
                 {
-                    GS.DrawString(line2, 175, 495, 0, Color.white, GS.FontEffect.RIM);
+                    GS.DrawString(line2, 125, 495, 0, Color.white, GS.FontEffect.RIM);
                 }
             }
             catch
@@ -2034,7 +2036,7 @@ public static class DisableTextScroll3
                 ;
             }
         }
-        GS.DrawString(descText, 175, 475, 0, Color.white, GS.FontEffect.RIM);
+        GS.DrawString(descText, 125, 475, 0, Color.white, GS.FontEffect.RIM);
         GS.m_font_scale_x = 1f;
         GS.m_font_scale_y = 1f;
         return false;
@@ -2494,6 +2496,48 @@ public static class CommandDraw5
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "ParseScript")]
+public static class TextReplace2
+{
+    public static void Prefix(ref string[] r3scriptRowIn)
+    {
+        for(int i = 0; i < r3scriptRowIn.Length; i++)
+        {
+            foreach(string s in r3scriptRowIn[i].Split('|'))
+            {
+                if (RS3UI.replacements.ContainsKey(s))
+                {
+                    r3scriptRowIn[i] = r3scriptRowIn[i].Replace(s, RS3UI.replacements[s]);
+                }
+            }
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MenuListText), "GetText_BtlUse")]
+public static class TextReplace
+{
+    public static void Postfix(ref string __result)
+    {
+        if (RS3UI.replacements.ContainsKey(__result))
+        {
+            __result = RS3UI.replacements[__result];
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MenuListText), "GetText", new Type[] { typeof(int),typeof(int),typeof(int) })]
+public static class TextReplace3
+{
+    public static void Postfix(ref string __result)
+    {
+        if (RS3UI.replacements.ContainsKey(__result))
+        {
+            __result = RS3UI.replacements[__result];
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(GS), "DrawString")]
 public static class TextOutline
 {
@@ -2603,6 +2647,29 @@ namespace RS3
         public static Vector2 rasterparameter = new Vector2(0f,0.02f);
         public static Action enemyName = null;
         public static int prints = 0;
+        public static int descLineLen = 85;
+        public static Dictionary<string, string> replacements = new Dictionary<string, string>();
+
+        public override void OnInitializeMelon()
+        {
+            base.OnInitializeMelon();
+            try
+            {
+                if (File.Exists("TextReplacement.txt"))
+                {
+                    string[] lines = File.ReadAllLines("TextReplacement.txt");
+                    for (int i = 0; i + 1 < lines.Length; i += 2)
+                    {
+                        replacements[lines[i]] = lines[i + 1];
+                    }
+                    Msg("Loaded " + replacements.Keys.Count.ToString() + " replacements from TextReplacement.txt");
+                }
+            }
+            catch(Exception e)
+            {
+                Msg("Error reading TextReplacement.json: " + e.Message);
+            }
+        }
 
         public override void OnUpdate()
         {

@@ -1,0 +1,10 @@
+This fusion spell halves incoming damage, damages your foes' front row, and places casters in the Tri-Anchor formation.
+This fusion spell reduces incoming damage by 60% and damages your foes' front row. Place casters in the Tri-Anchor formation.
+[Guard/Near/Party] 3 members in the center use a fusion spell to make enemies defenseless. Also deals damage to the front row of enemies at higher levels.
+[Guard/Near/Party] 3 members in the center use a fusion spell to mitigate enemy attacks. Also deals damage to the front row of enemies at higher levels.
+This fusion spell scorches a single enemy and places casters in the Power Raise formation.
+This fusion spell scorches a single enemy. Place casters in the Power Raise formation.
+This fusion spell sends enemies to the great unknown and places casters in the Power Raise formation.
+This fusion spell sends enemies to the great unknown. Place casters in the Power Raise formation.
+This fusion spell deals damage to all enemies and places casters in the Genbu formation.
+This fusion spell deals damage to all enemies. Place casters in the Genbu formation.
