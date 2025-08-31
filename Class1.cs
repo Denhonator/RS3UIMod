@@ -302,22 +302,18 @@ public static class FPSFixEventScroll
 {
     public static void Prefix(ref int x, ref int y, ref int frame, Field __instance)
     {
-        frame *= 2;
+        if(Application.targetFrameRate>30)
+            frame *= 2;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(Field.AbissEvent), "Update")]
 public static class FPSFixAbiss
 {
-    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    static void Prefix(int ___m_state)
     {
-        foreach (var code in instructions)
-        {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_1);
-            else
-                yield return code;
-        }
+        if(___m_state == 0 && Application.targetFrameRate > 30)
+            GameCore.m_field.m_bg_event_scroll_y -= 1;
     }
 }
 
@@ -628,7 +624,7 @@ public static class FPSFixTailSwipe2
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "gliderspike", "dmgskullcrash" };
+    static string[] halfSpeedFunc = { "gliderspike", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -647,10 +643,11 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="pal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds_arg.Contains("_"))
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") 
+            && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds_arg.Contains("_"))
         {
             string[] split = cmds_arg.Split('_');
-            int frameIndex = (cmds=="giant") ? 0 :
+            int frameIndex = (cmds=="giant" || cmds.Contains("monscl")) ? 0 :
                             cmds== "forcesetframe" ? 3 : 1;
             if (frameIndex < 0 || split[frameIndex][0]>'9')
                 return true;
@@ -701,14 +698,15 @@ public static class FPSFixUpdateFade
 public static class FPSFixSpecialEff
 {
     static float lastInv = 0f;
-    public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, ref Action ____update_ptn)
+    public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, 
+        ref Action ____update_ptn, ref Vector4 ____add_raster_y, ref Vector4 ____raster_param_y)
     {
         if(____inv_time != lastInv && Application.targetFrameRate > 30)
         {
             ____inv_time *= 0.5f;
             lastInv = ____inv_time;
         }
-        if(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
         {
             ____update_ptn();
             return false;
@@ -717,16 +715,48 @@ public static class FPSFixSpecialEff
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
-//public static class FPSFixSSOExecter
-//{
-//    public static bool Prefix(BattleLogic.SSOExecter __instance)
-//    {
-//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-//            return false;
-//        return true;
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update_aunasu_1")]
+public static class FPSFixAunas
+{
+    public static void Prefix(ref Vector4 ____raster_param_y, Vector4 ____add_raster_y)
+    {
+        if(Application.targetFrameRate>30)
+            ____raster_param_y -= ____add_raster_y * 0.5f;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "call_aunasu_appear")]
+public static class FPSFixAunas2
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_4).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_8);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
+public static class FPSFixSSOExecter
+{
+    public static bool Prefix(BattleLogic.SSOExecter __instance, List<SSObject> ____obj)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        {
+            foreach(SSObject ssobject in ____obj)
+            {
+                Msg(ssobject.m_fname);
+                ssobject.Draw();
+            }
+            return false;
+        }
+        return true;
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "RollingJumpCharacter")]
 public static class FPSFixBattleWinJump
@@ -940,7 +970,8 @@ public static class FPSFixBgFader
     public static void Prefix(ref int ___bgFadeFrame)
     {
         Msg("BgFader");
-        ___bgFadeFrame--;
+        if (Application.targetFrameRate > 30) ;
+            ___bgFadeFrame--;
     }
 }
 
@@ -1001,7 +1032,8 @@ public static class FPSFixShip2
     public static void Postfix(Field.ShipMoveEvnet __instance)
     {
         Field.ShipMoveEvnet shipevent = GameCore.m_field.m_field_event as Field.ShipMoveEvnet;
-        shipevent.m_acc_x /= 2;
+        if(Application.targetFrameRate>30)
+            shipevent.m_acc_x /= 2;
     }
 }
 
@@ -1015,7 +1047,8 @@ public static class FPSFixShakeCutscene
 
     public static void Postfix(ScriptDrive __instance)
     {
-        __instance.shakeInterval *= 2;
+        if(Application.targetFrameRate>30)
+            __instance.shakeInterval *= 2;
     }
 }
 
@@ -1026,6 +1059,75 @@ public static class FPSFixWobble
     {
         BattleLogic.BattleScene._raster_parameter_vy = RS3UI.rasterparameter.y * Time.deltaTime * -15f;
         BattleLogic.BattleScene._raster_parameter_vx = RS3UI.rasterparameter.x * Time.deltaTime * 15f;
+    }
+}
+
+[HarmonyLib.HarmonyPatch]
+public static class FPSFixTankBG
+{
+    public static System.Reflection.MethodBase TargetMethod()
+    {
+        Type type = HarmonyLib.AccessTools.FirstInner(typeof(SpecialBG), t => t.Name.Contains("BG_d06b"));
+        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Update"));
+    }
+
+    public static void Prefix(ref int ___m_spd, ref int ___m_x)
+    {
+        ___m_x += -___m_spd + (int)(___m_spd * 30 * Time.deltaTime);
+    }
+}
+
+[HarmonyLib.HarmonyPatch]
+public static class FPSFixBuneSky
+{
+    public enum State
+    {
+        NONE,NORMAL,SLOW,FAST,LEFT,WIN,LOSE
+    }
+    public static System.Reflection.MethodBase TargetMethod()
+    {
+        Type type = HarmonyLib.AccessTools.FirstInner(typeof(SpecialBG), t => t.Name.Contains("BG_d03e"));
+        return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Update"));
+    }
+
+    public static bool Prefix(ref SpecialBG.Base __instance, ref int ___m_timer, ref int ___m_change_timing, State ___m_state, ref float ___m_base_spd, float ___m_rad, ref float ___m_radius, float ___m_vrad, ref float ___m_x, float ___m_vx, ref float ___m_y, float ___m_vy)
+    {
+        float num = 0f; float num2 = 0f;
+
+        if (___m_state == State.NORMAL) {
+            if (__instance.IsStop)
+                return false;
+            ___m_timer++;
+            if (___m_timer > ___m_change_timing*2+1)
+            {
+                ___m_timer = 0;
+                ___m_change_timing = Sys.Rand(4, 8) * 30;
+                ___m_base_spd += (float)(Sys.Rand(0, 4) - 2) * 0.5f;
+                ___m_base_spd = Mathf.Clamp(___m_base_spd, 0.5f, 3f);
+            }
+            ___m_vrad = 0.016f * ___m_base_spd;
+            ___m_radius = 24f * ___m_base_spd;
+            num = Mathf.Cos(___m_rad) * ___m_radius;
+            num2 = Mathf.Sin(___m_rad) * ___m_radius;
+            ___m_vx = Mathf.Clamp(___m_vx + ((num >= 0f) ? 0.25f : (-0.25f)), -8f, 8f);
+            ___m_vy = Mathf.Clamp(___m_vy + ((num2 >= 0f) ? 0.25f : (-0.25f)), -8f, 8f);
+        }
+        else if(___m_state == State.WIN)
+        {
+            ___m_vx = -10f;
+            ___m_vy = 0;
+            num += 80f;
+        }
+        else if(___m_state == State.LOSE)
+        {
+            ___m_vx = 0;
+            ___m_vy = -10;
+            num2 -= 50f;
+        }
+        ___m_rad = (___m_rad + ___m_vrad * Time.deltaTime * 30f)%6.2831855f;
+        ___m_x = (___m_x + num + ___m_vx) % 4096f;
+        ___m_y = (___m_y + num2 + ___m_vy) % 4096f;
+        return false;
     }
 }
 
@@ -1134,7 +1236,6 @@ public static class FPSFixBetweenTurnSpin
 [HarmonyLib.HarmonyPatch(typeof(Field), "CharaUpdate")]
 public static class FPSFixMovement
 {
-    static int repeat = 0;
     static short[] m_jump_kidou = new short[] { 8, 16, 20, 25, 30, 36, 42, 49, 42, 36, 30, 24, 20, 16, 8, 0 };
 
     static bool btst(int a, int b)
@@ -1152,51 +1253,38 @@ public static class FPSFixMovement
             return false;
         }
         int fpsmult = Application.targetFrameRate > 30 ? 2 : 1;
-        repeat = 0;
 
-        if (ch.m_dash && ((ch.m_x % 2) != 0) || ((ch.m_y % 2) != 0))
+        if ((ch.m_dash && ((ch.m_x % 2) != 0) || ((ch.m_y % 2) != 0)) && !btst(ch.m_bg_attr, 1048576))
             ch.m_dash = false;
 
-        while (repeat >= 0)
-        {
-            int num = ch.GetSpeedDot();
-            int prevx = ch.m_x;
+        int num = ch.GetSpeedDot();
+        int prevx = ch.m_x;
 
-            int attr = __instance.m_bg.GetAttr(ch.m_cell_x, ch.m_cell_y);
-            int m_jump_attr = HarmonyLib.Traverse.Create(__instance).Field("m_jump_attr").GetValue<int>();
-            if (ch.m_jump_cnt > 0 && m_jump_attr == 8192)
+        int attr = __instance.m_bg.GetAttr(ch.m_cell_x, ch.m_cell_y);
+        int m_jump_attr = HarmonyLib.Traverse.Create(__instance).Field("m_jump_attr").GetValue<int>();
+        if (ch.m_jump_cnt > 0 && m_jump_attr == 8192)
+        {
+            ch.m_dash = true;
+        }
+        if (ch.m_dash && (ch.m_x & 3) == 0 && (ch.m_y & 3) == 0)
+        {
+            num = 4;
+        }
+        if (ch.m_jump_cnt > 0 && m_jump_attr == 4096)
+        {
+            ch.m_dash = false;
+            num = 2;
+        }
+        if (ch.m_jump_cnt > 0 && m_jump_attr == 8192)
+        {
+            num = 4;
+        }
+        ch.m_flags &= -129;
+        if ((ch.m_bg_attr & 8388608) == 0)
+        {
+            if (ch.m_moving)
             {
-                ch.m_dash = true;
-            }
-            if (ch.m_dash && (ch.m_x & 3) == 0 && (ch.m_y & 3) == 0)
-            {
-                num = 4;
-            }
-            if (ch.m_jump_cnt > 0 && m_jump_attr == 4096)
-            {
-                ch.m_dash = false;
-                num = 2;
-            }
-            if (ch.m_jump_cnt > 0 && m_jump_attr == 8192)
-            {
-                num = 4;
-            }
-            ch.m_flags &= -129;
-            if ((ch.m_bg_attr & 8388608) == 0)
-            {
-                if (ch.m_moving)
-                {
-                    if (btst(ch.m_bg_attr, 1048576) && num >= 2)
-                    {
-                        ch.m_flags |= 128;
-                        num /= 2;
-                        if (ch.m_dash && (ch.m_x & 1) == 0 && (ch.m_y & 1) == 0)
-                        {
-                            num = 2;
-                        }
-                    }
-                }
-                else if (btst(attr, 1048576) && num >= 2)
+                if (btst(ch.m_bg_attr, 1048576) && num >= 2)
                 {
                     ch.m_flags |= 128;
                     num /= 2;
@@ -1206,222 +1294,231 @@ public static class FPSFixMovement
                     }
                 }
             }
-            if (ch.m_ch != null)
+            else if (btst(attr, 1048576) && num >= 2)
             {
-                if (btst(attr, 4194304) && ch.m_ofs_y == 0)
+                ch.m_flags |= 128;
+                num /= 2;
+                if (ch.m_dash && (ch.m_x & 1) == 0 && (ch.m_y & 1) == 0)
                 {
-                    if (btst(ch.m_flags, 4))
-                    {
-                        ch.m_water_draw = true;
-                        ch.m_ch.m_half_alpha = true;
-                    }
-                }
-                else
-                {
-                    ch.m_water_draw = false;
-                    ch.m_ch.m_half_alpha = false;
+                    num = 2;
                 }
             }
-            ch.m_force_dir = 0;
-            if (btst(attr, 52428800))
+        }
+        if (ch.m_ch != null)
+        {
+            if (btst(attr, 4194304) && ch.m_ofs_y == 0)
             {
-                int num2 = attr & 52428800;
-                if (num2 != 2097152)
+                if (btst(ch.m_flags, 4))
                 {
-                    if (num2 != 18874368)
+                    ch.m_water_draw = true;
+                    ch.m_ch.m_half_alpha = true;
+                }
+            }
+            else
+            {
+                ch.m_water_draw = false;
+                ch.m_ch.m_half_alpha = false;
+            }
+        }
+        ch.m_force_dir = 0;
+        if (btst(attr, 52428800))
+        {
+            int num2 = attr & 52428800;
+            if (num2 != 2097152)
+            {
+                if (num2 != 18874368)
+                {
+                    if (num2 != 35651584)
                     {
-                        if (num2 != 35651584)
+                        if (num2 == 52428800)
                         {
-                            if (num2 == 52428800)
-                            {
-                                ch.m_force_dir = 4;
-                            }
-                        }
-                        else
-                        {
-                            ch.m_force_dir = 3;
+                            ch.m_force_dir = 4;
                         }
                     }
                     else
                     {
-                        ch.m_force_dir = 2;
+                        ch.m_force_dir = 3;
                     }
                 }
                 else
                 {
-                    ch.m_force_dir = 1;
+                    ch.m_force_dir = 2;
                 }
             }
-            if(repeat==0 && !(fpsmult >= 2 && (Time.frameCount % 2) == 0 && ch.m_dash))
-                ch.Update();
-            if (ch.m_script_move)
+            else
+            {
+                ch.m_force_dir = 1;
+            }
+        }
+        if(!(fpsmult >= 2 && (Time.frameCount % 2) == 0 && ch.m_dash))
+            ch.Update();
+        if (ch.m_script_move)
+        {
+            return false;
+        }
+        ___m_jump_kidou = m_jump_kidou;
+        ___m_jump_kidou2 = m_jump_kidou;
+        System.Reflection.MethodInfo dynMethod = __instance.GetType().GetMethod("test_hit_npc",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        if (ch.m_jump_cnt > 0)
+        {
+            if (m_jump_attr == 8192)
+            {
+                __instance.CharaMove(ch, ch.m_dir, true, false);
+                ch.m_ofs_y = (int)___m_jump_kidou[___m_jump_kidou.Length - ch.m_jump_cnt];
+                ch.m_jump_cnt--;
+                if (ch.m_jump_cnt == 0)
+                {
+                    ch.m_jump_cnt = -1;
+                    dynMethod.Invoke(__instance, new object[] { ch });
+                }
+            }
+            if (m_jump_attr == 4096)
+            {
+                __instance.CharaMove(ch, ch.m_dir, true, false);
+                ch.m_ofs_y = (int)___m_jump_kidou2[___m_jump_kidou2.Length - ch.m_jump_cnt];
+                ch.m_jump_cnt--;
+                if (ch.m_jump_cnt == 0)
+                {
+                    dynMethod.Invoke(__instance, new object[] { ch });
+                }
+            }
+        }
+        int num3 = ch.m_cell_x * 8;
+        int num4 = ch.m_cell_y * 8;
+        if (btst(attr, 67108864) || ch.m_cmd_opt == 1)
+        {
+            if (ch.m_dash && (ch.m_x & 3) == 0)
+            {
+                num = 4;
+            }
+
+            if (num >= 2 && !ch.m_dash)
+                num /= fpsmult;
+            else if(fpsmult >= 2 && (Time.frameCount % 2) != 0 && !ch.m_dash)
             {
                 return false;
             }
-            ___m_jump_kidou = m_jump_kidou;
-            ___m_jump_kidou2 = m_jump_kidou;
-            System.Reflection.MethodInfo dynMethod = __instance.GetType().GetMethod("test_hit_npc",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-            if (ch.m_jump_cnt > 0)
+            if (ch.m_x != num3)
             {
-                if (m_jump_attr == 8192)
+                ch.m_moving = true;
+                if (ch.m_x < num3)
                 {
-                    __instance.CharaMove(ch, ch.m_dir, true, false);
-                    ch.m_ofs_y = (int)___m_jump_kidou[___m_jump_kidou.Length - ch.m_jump_cnt];
-                    ch.m_jump_cnt--;
-                    if (ch.m_jump_cnt == 0)
-                    {
-                        ch.m_jump_cnt = -1;
-                        dynMethod.Invoke(__instance, new object[] { ch });
-                    }
-                }
-                if (m_jump_attr == 4096)
-                {
-                    __instance.CharaMove(ch, ch.m_dir, true, false);
-                    ch.m_ofs_y = (int)___m_jump_kidou2[___m_jump_kidou2.Length - ch.m_jump_cnt];
-                    ch.m_jump_cnt--;
-                    if (ch.m_jump_cnt == 0)
-                    {
-                        dynMethod.Invoke(__instance, new object[] { ch });
-                    }
-                }
-            }
-            int num3 = ch.m_cell_x * 8;
-            int num4 = ch.m_cell_y * 8;
-            if (btst(attr, 67108864) || ch.m_cmd_opt == 1)
-            {
-                if (ch.m_dash && (ch.m_x & 3) == 0)
-                {
-                    num = 4;
-                }
-
-                if (num >= 2 && !ch.m_dash)
-                    num /= fpsmult;
-                else if(fpsmult >= 2 && (Time.frameCount % 2) != 0 && !ch.m_dash)
-                {
-                    return false;
-                }
-
-                if (ch.m_x != num3)
-                {
-                    ch.m_moving = true;
-                    if (ch.m_x < num3)
-                    {
-                        ch.m_x += num;
-                    }
-                    else
-                    {
-                        ch.m_x -= num;
-                    }
-                    if (ch.m_y < num4)
-                    {
-                        ch.m_y += num / 2;
-                    }
-                    else
-                    {
-                        ch.m_y -= num / 2;
-                    }
+                    ch.m_x += num;
                 }
                 else
                 {
-                    ch.m_moving = false;
+                    ch.m_x -= num;
                 }
-                if ((ch.m_dir == 0 || ch.m_dir == 1) && ch.m_y != num4)
+                if (ch.m_y < num4)
                 {
-                    if (ch.m_y < num4)
-                    {
-                        ch.m_y += num;
-                    }
-                    else
-                    {
-                        ch.m_y -= num;
-                    }
+                    ch.m_y += num / 2;
+                }
+                else
+                {
+                    ch.m_y -= num / 2;
                 }
             }
             else
             {
-                if (num >= 2)
-                    num /= fpsmult;
-                else if (fpsmult >= 2 && (Time.frameCount % 2) == 0)
-                {
-                    return false;
-                }
-                if (ch.m_dash)
-                    num = 2;
-
-                if (ch.m_x != num3)
-                {
-                    ch.m_moving = true;
-                    if (ch.m_x < num3)
-                    {
-                        ch.m_x += num;
-                    }
-                    else
-                    {
-                        ch.m_x -= num;
-                    }
-                }
-                if (ch.m_y != num4)
-                {
-                    ch.m_moving = true;
-                    if (ch.m_y < num4)
-                    {
-                        ch.m_y += num;
-                    }
-                    else
-                    {
-                        ch.m_y -= num;
-                    }
-                }
+                ch.m_moving = false;
             }
-            bool flag = (ch.m_cmd_opt & 4) != 0;
-            if (flag)
+            if ((ch.m_dir == 0 || ch.m_dir == 1) && ch.m_y != num4)
             {
-                if (ch.m_cmd_target_x == ch.m_cell_x && ch.m_cmd_target_y == ch.m_cell_y)
+                if (ch.m_y < num4)
                 {
-                    ch.m_cmd_nmove = 0;
-                    ch.m_cmd_opt = 0;
+                    ch.m_y += num;
                 }
                 else
                 {
-                    ch.m_cmd_nmove++;
+                    ch.m_y -= num;
                 }
             }
-            if (ch.m_cmd_nmove > 0)
+        }
+        else
+        {
+            if (num >= 2)
+                num /= fpsmult;
+            else if (fpsmult >= 2 && (Time.frameCount % 2) == 0)
             {
-                if (ch.m_x == num3 && (ch.m_y == num4 || ch.m_cmd_opt == 1))
+                return false;
+            }
+            if (ch.m_dash)
+            {
+                //if (ch.m_dash && (ch.m_x & 1) == 0 && (ch.m_y & 1) == 0)
+                num = btst(ch.m_bg_attr, 1048576) ? 1 : 2; //Fog check
+            }
+
+            if (ch.m_x != num3)
+            {
+                ch.m_moving = true;
+                if (ch.m_x < num3)
                 {
-                    if (ch.m_x == num3 && ch.m_y == num4)
-                    {
-                        ch.m_cmd_nmove--;
-                    }
-                    ch.m_moving = false;
-                    int dir = ch.m_dir;
-                    __instance.CharaMove(ch, ch.m_cmd_dir, ch.m_cmd_force, false);
-                    if (ch.m_cmd_opt == 2)
-                    {
-                        ch.SetDir(dir);
-                    }
-                    ch.m_moving = true;
-                    if (ch.m_cmd_nmove == 0)
-                    {
-                        ch.m_cmd_dir = -1;
-                        ch.m_flags &= -17;
-                    }
+                    ch.m_x += num;
                 }
+                else
+                {
+                    ch.m_x -= num;
+                }
+            }
+            if (ch.m_y != num4)
+            {
+                ch.m_moving = true;
+                if (ch.m_y < num4)
+                {
+                    ch.m_y += num;
+                }
+                else
+                {
+                    ch.m_y -= num;
+                }
+            }
+        }
+        bool flag = (ch.m_cmd_opt & 4) != 0;
+        if (flag)
+        {
+            if (ch.m_cmd_target_x == ch.m_cell_x && ch.m_cmd_target_y == ch.m_cell_y)
+            {
+                ch.m_cmd_nmove = 0;
+                ch.m_cmd_opt = 0;
             }
             else
             {
-                ch.m_cmd_dir = -1;
-                if (ch.m_x == num3 && ch.m_cmd_opt == 1)
+                ch.m_cmd_nmove++;
+            }
+        }
+        if (ch.m_cmd_nmove > 0)
+        {
+            if (ch.m_x == num3 && (ch.m_y == num4 || ch.m_cmd_opt == 1))
+            {
+                if (ch.m_x == num3 && ch.m_y == num4)
                 {
-                    ch.m_moving = false;
+                    ch.m_cmd_nmove--;
+                }
+                ch.m_moving = false;
+                int dir = ch.m_dir;
+                __instance.CharaMove(ch, ch.m_cmd_dir, ch.m_cmd_force, false);
+                if (ch.m_cmd_opt == 2)
+                {
+                    ch.SetDir(dir);
+                }
+                ch.m_moving = true;
+                if (ch.m_cmd_nmove == 0)
+                {
+                    ch.m_cmd_dir = -1;
+                    ch.m_flags &= -17;
                 }
             }
-            if (repeat == 1)
-                break;
-            repeat -= 1;
+        }
+        else
+        {
+            ch.m_cmd_dir = -1;
+            if (ch.m_x == num3 && ch.m_cmd_opt == 1)
+            {
+                ch.m_moving = false;
+            }
         }
         return false;
     }
