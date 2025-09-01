@@ -40,4 +40,8 @@
     </Reference>
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="copy $(TargetPath) F:\SteamLibrary\steamapps\common\RomancingSaGa3\Mods\RS3.dll" />
+  </Target>
+
 </Project>

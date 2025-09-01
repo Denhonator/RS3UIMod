@@ -381,10 +381,10 @@ public static class FPSFixTextFade
 [HarmonyLib.HarmonyPatch(typeof(ActionVM), "DispatchAction")]
 public static class FPSFixPrint
 {
-    public static void Prefix(ref string currentAction, ActionVM __instance)
+    public static void Prefix(ref string currentAction, ActionVM __instance, ref string[] ___currentActionParameter)
     {
         if (RS3UI.prints > 1)
-            Msg("ActionVM: " + currentAction);
+            Msg("ActionVM: " + currentAction + "," + string.Join(",", ___currentActionParameter));
     }
 }
 
@@ -471,6 +471,15 @@ public static class FPSFixStay2
                 currentActionParameter[0] = (FPSFixMoveKeepDir.StringToInt(currentActionParameter[0]) * 2).ToString();
             }
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "ParseAction")]
+public static class ActionFixes
+{
+    public static void Prefix(ref string[] actionRow)
+    {
+        actionRow[5681] = actionRow[5681].Replace("scroll,down,8", "scroll,down,11"); //Maximus reveal scroll fix
     }
 }
 
