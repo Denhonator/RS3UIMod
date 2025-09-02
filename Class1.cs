@@ -134,9 +134,9 @@ public static class TrackGameStateChanges
         {
             //System.IO.File.AppendAllText("test.txt", $"Detected state change {{{oldState} => {newState}}}\n");
             SetGameSpeedByState(currState);
-            if (Screen.currentResolution.refreshRate % 60 == 0 && Screen.currentResolution.refreshRate <= 240) {
-                QualitySettings.vSyncCount = Screen.currentResolution.refreshRate / Application.targetFrameRate;
-            }
+            //if (Screen.currentResolution.refreshRate % 60 == 0 && Screen.currentResolution.refreshRate <= 240) {
+            //    QualitySettings.vSyncCount = Screen.currentResolution.refreshRate / Application.targetFrameRate;
+            //}
         }
 
         IgnoreNextStateChange = false;
@@ -510,6 +510,15 @@ public static class FPSFixRapidVolley
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(FlashArrow), "StateArrowCalc")]
+public static class FPSFixFlashArrow
+{
+    public static void Prefix(FlashArrow __instance, ref float ___arrowSpeed)
+    {
+        ___arrowSpeed = 12f * Character.SCALE_X;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(Monster), "Update")]
 public static class FPSFixSSObject2
 {
@@ -633,10 +642,35 @@ public static class FPSFixTailSwipe2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_random_move")]
+public static class FPSFixRandomMove
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)12);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 6f)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 12f);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "gliderspike", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc" };
+    static string[] halfSpeedFunc = { "gliderspike", "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -655,31 +689,38 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") 
-            && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds_arg.Contains("_"))
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") 
+            && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
-            int frameIndex = (cmds=="giant" || cmds.Contains("monscl")) ? 0 :
+            int frameIndex = (!cmds_arg.Contains('_') || split[1].Contains('.')) ? 0 :
                             cmds== "forcesetframe" ? 3 : 1;
             if (frameIndex < 0 || split[frameIndex][0]>'9')
                 return true;
 
-            int frames = int.Parse(split[frameIndex]);
-            if (frames > 1)
+            try
             {
-                if (frameIndex==1 && split.Length>2 && split[0][0] >= '0' && split[0][0] <= '9')
-                    split[0] = (int.Parse(split[0]) * 2).ToString();
-                split[frameIndex] = (frames*2).ToString();
-                string s = "";
-                for (int i = 0; i < split.Length; i++)
+                int frames = int.Parse(split[frameIndex]);
+                if (frames > 1)
                 {
-                    s += split[i];
-                    if (i + 1 < split.Length)
-                        s += "_";
+                    if (frameIndex == 1 && split.Length > 2 && split[0][0] >= '0' && split[0][0] <= '9')
+                        split[0] = (int.Parse(split[0]) * 2).ToString();
+                    split[frameIndex] = (frames * 2).ToString();
+                    string s = "";
+                    for (int i = 0; i < split.Length; i++)
+                    {
+                        s += split[i];
+                        if (i + 1 < split.Length)
+                            s += "_";
+                    }
+                    cmds_arg = s;
+                    if (RS3UI.prints > 0)
+                        Msg("Modified " + cmds + " to " + cmds_arg);
                 }
-                cmds_arg = s;
-                if (RS3UI.prints > 0)
-                    Msg("Modified " + cmds + " to " + cmds_arg);
+            }
+            catch (Exception e)
+            {
+                Msg("Command modify error: " + e.Message);
             }
         }
         return true;
@@ -1102,7 +1143,7 @@ public static class FPSFixBuneSky
         return HarmonyLib.AccessTools.FirstMethod(type, method => method.Name.Contains("Update"));
     }
 
-    public static bool Prefix(ref SpecialBG.Base __instance, ref int ___m_timer, ref int ___m_change_timing, State ___m_state, ref float ___m_base_spd, float ___m_rad, ref float ___m_radius, float ___m_vrad, ref float ___m_x, float ___m_vx, ref float ___m_y, float ___m_vy)
+    public static bool Prefix(ref SpecialBG.Base __instance, ref int ___m_timer, ref int ___m_change_timing, State ___m_state, ref float ___m_base_spd, ref float ___m_rad, ref float ___m_radius, ref float ___m_vrad, ref float ___m_x, ref float ___m_vx, ref float ___m_y, ref float ___m_vy)
     {
         float num = 0f; float num2 = 0f;
 
@@ -1137,8 +1178,8 @@ public static class FPSFixBuneSky
             num2 -= 50f;
         }
         ___m_rad = (___m_rad + ___m_vrad * Time.deltaTime * 30f)%6.2831855f;
-        ___m_x = (___m_x + num + ___m_vx) % 4096f;
-        ___m_y = (___m_y + num2 + ___m_vy) % 4096f;
+        ___m_x = (___m_x + (num + ___m_vx) * Time.deltaTime * 30f) % 4096f;
+        ___m_y = (___m_y + (num2 + ___m_vy) * Time.deltaTime * 30f) % 4096f;
         return false;
     }
 }
@@ -1886,6 +1927,10 @@ public static class CommanderTacticsDrawAll
                 GS.DrawStringMenu(BattleDataList.tacticsNameDataList[6].nameJpn, 200, 120 + 6 * 40, 0, Color.white, GS.FontEffect.CURSOR, 0, 3, 0.9f);
         }
     }
+    static void Postfix(int ___state)
+    {
+        RS3UI.windowType = "";
+    }
 }
 
 [HarmonyLib.HarmonyPatch]
@@ -1919,7 +1964,6 @@ public static class CommandDrawAll
             for (int i = 0; i < 16; i++)
                 ___commandTouch[i] = "commander_txt_" + i.ToString("D2");
         }
-        //___menuScroll = 0;
     }
     static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
     {
@@ -2542,20 +2586,6 @@ public static class FormationMenuUI2
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleFormationWindow), "Update")]
-public static class FormationChooseWindow2
-{
-    public static void Prefix(BattleFormationWindow __instance)
-    {
-        RS3UI.windowType = "PageName";
-    }
-
-    public static void Postfix(BattleFormationWindow __instance)
-    {
-        RS3UI.windowType = "";
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(BattleButtonTri), "SetHorizontalButton")]
 public static class HideExtraButtons2
 {
@@ -2587,74 +2617,32 @@ public static class CommandDraw3
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderFormationText")]
-public static class CommandDraw6
+[HarmonyLib.HarmonyPatch(typeof(BattleFormationWindow), "Update")]
+public static class FormationChooseWindow2
 {
-    public static void Prefix()
+    public static void Prefix(BattleFormationWindow __instance)
     {
-        RS3UI.windowType = "Command";
+        RS3UI.windowType = "PageName";
     }
-    public static void Postfix()
+
+    public static void Postfix(BattleFormationWindow __instance)
     {
         RS3UI.windowType = "";
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderTacticsText")]
-public static class CommandDraw7
+[HarmonyLib.HarmonyPatch]
+public static class CommandDraw
 {
-    public static void Prefix()
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
-        RS3UI.windowType = "Command";
+        //yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "CommandNormalText");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "NormalCommandFixedDraw");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "CommanderNormalText");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "CommanderFormationText");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommanderNormalText");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommandNormalText");
     }
-    public static void Postfix()
-    {
-        RS3UI.windowType = "";
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderTacticsDraw")]
-public static class CommandDraw8
-{
-    public static void Prefix()
-    {
-        RS3UI.windowType = "Command";
-    }
-    public static void Postfix()
-    {
-        RS3UI.windowType = "";
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommandMode), "NormalCommandFixedDraw")]
-public static class CommandDraw2
-{
-    public static void Prefix()
-    {
-        RS3UI.windowType = "Command";
-    }
-    public static void Postfix()
-    {
-        RS3UI.windowType = "";
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(SarahCommander), "CommanderNormalText")]
-public static class CommandDraw4
-{
-    public static void Prefix()
-    {
-        RS3UI.windowType = "Command";
-    }
-    public static void Postfix()
-    {
-        RS3UI.windowType = "";
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderNormalText")]
-public static class CommandDraw5
-{
     public static void Prefix()
     {
         RS3UI.windowType = "Command";
