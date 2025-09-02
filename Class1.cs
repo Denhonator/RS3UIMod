@@ -134,6 +134,9 @@ public static class TrackGameStateChanges
         {
             //System.IO.File.AppendAllText("test.txt", $"Detected state change {{{oldState} => {newState}}}\n");
             SetGameSpeedByState(currState);
+            if (Screen.currentResolution.refreshRate % 60 == 0 && Screen.currentResolution.refreshRate <= 240) {
+                QualitySettings.vSyncCount = Screen.currentResolution.refreshRate / Application.targetFrameRate;
+            }
         }
 
         IgnoreNextStateChange = false;
@@ -1398,37 +1401,36 @@ public static class FPSFixMovement
         int num4 = ch.m_cell_y * 8;
         if (btst(attr, 67108864) || ch.m_cmd_opt == 1)
         {
-            if (ch.m_dash && (ch.m_x & 3) == 0)
-            {
-                num = 4;
-            }
+            ch.m_ofs_x = 0;
+            ch.m_ofs_y = 0;
+            __instance.m_bg_event_scroll_x = 0;
+            __instance.m_bg_event_scroll_y = 0;
 
-            if (num >= 2 && !ch.m_dash)
-                num /= fpsmult;
-            else if(fpsmult >= 2 && (Time.frameCount % 2) != 0 && !ch.m_dash)
+            if (ch.m_dash && (ch.m_x & 3) == 0)
+                num = 4;
+
+            if (ch.m_x != num3 && fpsmult >= 2 && (Time.frameCount % 2) == 0)
             {
+                __instance.m_bg_event_scroll_x += (ch.m_dir == 2 ? -1 : 1) * (ch.m_dash ? 2 : 1);
+                __instance.m_bg_event_scroll_y = (ch.m_dir == 2 ? -1 : 1) * (ch.m_dash ? -1 : 0);
+                ch.m_ofs_x = __instance.m_bg_event_scroll_x * 2;
+                ch.m_ofs_y = __instance.m_bg_event_scroll_y * -2;
+                //if(Time.frameCount%4==0)
+                //    __instance.m_bg_event_scroll_y += ch.m_dir == 2 ? -1 : 1;
                 return false;
             }
 
             if (ch.m_x != num3)
             {
-                ch.m_moving = true;
                 if (ch.m_x < num3)
-                {
                     ch.m_x += num;
-                }
                 else
-                {
                     ch.m_x -= num;
-                }
                 if (ch.m_y < num4)
-                {
                     ch.m_y += num / 2;
-                }
                 else
-                {
                     ch.m_y -= num / 2;
-                }
+                ch.m_moving = ch.m_x != num3;
             }
             else
             {
@@ -1451,14 +1453,9 @@ public static class FPSFixMovement
             if (num >= 2)
                 num /= fpsmult;
             else if (fpsmult >= 2 && (Time.frameCount % 2) == 0)
-            {
                 return false;
-            }
             if (ch.m_dash)
-            {
-                //if (ch.m_dash && (ch.m_x & 1) == 0 && (ch.m_y & 1) == 0)
                 num = btst(ch.m_bg_attr, 1048576) ? 1 : 2; //Fog check
-            }
 
             if (ch.m_x != num3)
             {
@@ -1875,46 +1872,112 @@ public static class FPSFixBattleMess
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderTacticsText")]
+public static class CommanderTacticsDrawAll
+{
+    static void Prefix(int ___state)
+    {
+        RS3UI.windowType = "Command";
+        if (___state == 4)
+        {
+            if (GameCore.m_userProfile.language == 1)
+                GS.DrawStringMenu(BattleDataList.tacticsNameDataList[6].nameEng, 200, 126 + 6 * 40, 0, Color.white, GS.FontEffect.CURSOR, 0, 3, 0.9f);
+            else
+                GS.DrawStringMenu(BattleDataList.tacticsNameDataList[6].nameJpn, 200, 120 + 6 * 40, 0, Color.white, GS.FontEffect.CURSOR, 0, 3, 0.9f);
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch]
+public static class CommandDrawAll
+{
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "SetMenuScroll");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PushDownButton");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawCommandSkill");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawCommnadSpell");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "SetMenuScroll");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PushDownButton");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PageDrawBackPack");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PageDrawFormationSkill");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "CommanderFormationText");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "SetMenuScroll");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PushDownButton");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawBackPack");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawFormationSkill");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawCommandSpell");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawCommandSkill");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommanderFormationText");
+    }
+
+    static void Prefix(ref int ___menuScroll, ref string[] ___commandTouch)
+    {
+        if (___commandTouch.Length < 16)
+        {
+            ___commandTouch = new string[16];
+            for (int i = 0; i < 16; i++)
+                ___commandTouch[i] = "commander_txt_" + i.ToString("D2");
+        }
+        //___menuScroll = 0;
+    }
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)16);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(CommandMode), "SetWindowSize", new Type[] { })]
-public static class CompactUI2
+public static class WindowSizeCommand
 {
     public static bool Prefix(CommandMode __instance)
     {
         int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
         BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("window").GetValue<BattleCommandWindow>();
-        if (6 < menuElement)
-            commandWindow.SetWindowSize(270, 172);
-        else
-            commandWindow.SetWindowSize(270, 16 + menuElement * 26);
+        commandWindow.SetWindowSize(270, 16 + menuElement * 26);
         commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
         return false;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommanderMode), "SetWindowSize", new Type[] { })]
-public static class CompactUI4
+public static class WindowSizeCommander
 {
     public static bool Prefix(CommanderMode __instance)
     {
         int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
         BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("commandWindow").GetValue<BattleCommandWindow>();
+        commandWindow.SetWindowSize(260, 16 + menuElement * 26);
+        commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
+        return false;
+    }
+}
 
-        if (6 < menuElement)
-        {
-            commandWindow.SetWindowSize(260, 172);
-        }
-        else
-        {
-            commandWindow.SetWindowSize(260, 16 + menuElement * 26);
-        }
-
+[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "SetWindowSize", new Type[] { })]
+public static class WindowSizeSarah
+{
+    public static bool Prefix(CommanderMode __instance)
+    {
+        int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
+        BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("commandWindow").GetValue<BattleCommandWindow>();
+        commandWindow.SetWindowSize(260, 16 + menuElement * 26);
         commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
         return false;
     }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommanderPageNameWin), "Draw", new Type[] { typeof(bool) })]
-public static class CompactUI5
+public static class PageNameCommander
 {
     public static void Prefix(ref bool canScroll, CommanderPageNameWin __instance)
     {
@@ -1928,7 +1991,7 @@ public static class CompactUI5
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommandMode), "NormalUIUpdate", new Type[] { })]
-public static class CompactUI3
+public static class PageNameSizeCommand
 {
     public static void Prefix(CommandMode __instance)
     {
@@ -1940,7 +2003,7 @@ public static class CompactUI3
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderNormalUI", new Type[] { })]
-public static class CompactUI6
+public static class PageNameSizeCommander
 {
     public static void Prefix(CommanderMode __instance)
     {
@@ -1952,7 +2015,7 @@ public static class CompactUI6
 }
 
 [HarmonyLib.HarmonyPatch(typeof(VariableWindowManager), "SetMessagePlus", new Type[] { typeof(int), typeof(int),typeof(int),typeof(int),typeof(int),typeof(string) })]
-public static class CompactUI7
+public static class PopupMessages
 {
     public static void Prefix(ref int WordCountX, ref int WordCountY, ref string mess)
     {
@@ -1986,7 +2049,7 @@ public static class CompactUI7
 //}
 
 [HarmonyLib.HarmonyPatch(typeof(CommandCursor), "SetCursor", new Type[] { typeof(string[]), typeof(string) })]
-public static class CursorPosition
+public static class CursorPositionCommand
 {
     public static void Postfix(ref string[] _array, ref string _name, CommandCursor __instance)
     {
@@ -1996,7 +2059,7 @@ public static class CursorPosition
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommanderCursor), "SetCursor", new Type[] { typeof(string[]), typeof(string) })]
-public static class CursorPosition2
+public static class CursorPositionCommander
 {
     public static void Postfix(ref string[] _array, ref string _name, CommanderCursor __instance)
     {
@@ -2006,7 +2069,7 @@ public static class CursorPosition2
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommandDescText), "DescTextUpdate", new Type[] {})]
-public static class DisableTextScroll
+public static class DisableTextScrollCommand
 {
     public static bool Prefix(CommandDescText __instance)
     {
@@ -2053,7 +2116,7 @@ public static class DisableTextScroll
 }
 
 [HarmonyLib.HarmonyPatch(typeof(CommanderDescText), "DescTextUpdate", new Type[] { })]
-public static class DisableTextScroll2
+public static class DisableTextScrollCommander
 {
     public static bool Prefix(CommanderDescText __instance)
     {
@@ -2100,7 +2163,7 @@ public static class DisableTextScroll2
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ScrollMessage), "Update", new Type[] { })]
-public static class DisableTextScroll3
+public static class DisableTextScrollMenu
 {
     public static bool Prefix(ScrollMessage __instance)
     {
@@ -2166,7 +2229,7 @@ public static class TextPosition
             else if (_x >= 573 && _x <= 593)
                 _x -= 160;
             _x -= 125;
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 16; i++)
             {
                 if (_y == 126 + i * 40)
                 {
