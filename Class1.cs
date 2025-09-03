@@ -486,20 +486,20 @@ public static class ActionFixes
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleEffect.SSObject), "Update")]
-public static class FPSFixSSObject
-{
-    public static bool Prefix(BattleEffect.SSObject __instance, SSObject ___m_obj)
-    {
-        if (___m_obj != null && ___m_obj.m_anime != null)
-        {
-            SSObject.Anime anime = ___m_obj.m_anime[___m_obj.m_cur_anim_idx];
-            if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && (anime.m_cur_frame >= 0 || anime.m_end_frame <= 0))
-                return false;
-        }
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleEffect.SSObject), "Update")]
+//public static class FPSFixSSObject
+//{
+//    public static bool Prefix(BattleEffect.SSObject __instance, SSObject ___m_obj)
+//    {
+//        if (___m_obj != null && ___m_obj.m_anime != null)
+//        {
+//            SSObject.Anime anime = ___m_obj.m_anime[___m_obj.m_cur_anim_idx];
+//            if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && (anime.m_cur_frame >= 0 || anime.m_end_frame <= 0))
+//                return false;
+//        }
+//        return true;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(DetarameYa), "StateArrowCalc")]
 public static class FPSFixRapidVolley
@@ -519,31 +519,31 @@ public static class FPSFixFlashArrow
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(Monster), "Update")]
-public static class FPSFixSSObject2
-{
-    public static bool Prefix(Monster __instance)
-    {
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-            return false;
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(Monster), "Update")]
+//public static class FPSFixSSObject2
+//{
+//    public static bool Prefix(Monster __instance)
+//    {
+//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+//            return false;
+//        return true;
+//    }
+//}
 
-[HarmonyLib.HarmonyPatch(typeof(SSObject), "Update")]
-public static class FPSFixSSObjectSSMovie
-{
-    public static void Prefix(SSObject __instance)
-    {
-        if (__instance.GetType() == typeof(EventUtil.ScriptSSObject) &&
-            Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-        {
-            SSObject.Anime anime = __instance.m_anime[__instance.m_cur_anim_idx];
-            if (anime.m_cur_frame > 0 && anime.m_end_frame - anime.m_cur_frame > 10)
-                anime.m_cur_frame--;
-        }
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(SSObject), "Update")]
+//public static class FPSFixSSObjectSSMovie
+//{
+//    public static void Prefix(SSObject __instance)
+//    {
+//        if (__instance.GetType() == typeof(EventUtil.ScriptSSObject) &&
+//            Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+//        {
+//            SSObject.Anime anime = __instance.m_anime[__instance.m_cur_anim_idx];
+//            if (anime.m_cur_frame > 0 && anime.m_end_frame - anime.m_cur_frame > 10)
+//                anime.m_cur_frame--;
+//        }
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "EffectLoader")]
 public static class FPSFixCmdData
@@ -581,25 +581,10 @@ public static class FPSFixAfterActionJump
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_monswinddart")]
 public static class FPSFixWindDart
 {
-    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    static void Prefix(ref int ___mons_winddart_frame_count)
     {
-        foreach (var code in instructions)
-        {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode)
-            {
-                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)12);
-                newCode.labels = code.labels;
-                yield return newCode;
-            }
-            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_7).opcode)
-            {
-                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)14);
-                newCode.labels = code.labels;
-                yield return newCode;
-            }
-            else
-                yield return code;
-        }
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            ___mons_winddart_frame_count--;
     }
 }
 
@@ -639,6 +624,84 @@ public static class FPSFixTailSwipe2
             return false;
         }
         return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(SSObject), "Load", new Type[] { typeof(Stream),typeof(SSObject.SSPreLoad),typeof(bool) })]
+public static class FPSFixInterpolateSS2
+{
+    static void Prefix(SSObject __instance)
+    {
+        FPSFixInterpolateSS.doubled.Remove(__instance.m_fname);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(SSObject.Anime), "Load")]
+public static class FPSFixInterpolateSS
+{
+    public static bool interpolate = true;
+    public static Dictionary<string, bool> doubled = new Dictionary<string, bool>();
+    static void Postfix(SSObject.Anime __instance)
+    {
+        if (interpolate && !doubled.ContainsKey(__instance.m_ssobj.m_fname))
+        {
+            Vector3[] newVertcises = new Vector3[__instance.m_ssobj.m_vtx_array.Length * 2];
+            __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, 0);
+            __instance.m_ssobj.m_vtx_array = newVertcises;
+
+            Vector2[] newUV = new Vector2[__instance.m_ssobj.m_uv_array.Length * 2];
+            __instance.m_ssobj.m_uv_array.CopyTo(newUV, 0);
+            __instance.m_ssobj.m_uv_array = newUV;
+
+            if (__instance.m_ssobj.m_color_array != null)
+            {
+                Color32[] newColor = new Color32[__instance.m_ssobj.m_color_array.Length * 2];
+                __instance.m_ssobj.m_color_array.CopyTo(newColor, 0);
+                __instance.m_ssobj.m_color_array = newColor;
+            }
+
+            __instance.m_ssobj.m_nvtx = newVertcises.Length;
+            doubled[__instance.m_ssobj.m_fname] = true;
+        }
+
+        SSObject.Frame[] newFrames = new SSObject.Frame[__instance.m_frames.Length * 2];
+        for (int i = 0; i < __instance.m_frames.Length; i++)
+        {
+            for (int j = 0; j < 2; j++)
+            {
+                newFrames[i * 2 + j].m_meshes = new SSObject.Poly[__instance.m_frames[i].m_meshes.Length];
+                for (int k = 0; k < __instance.m_frames[i].m_meshes.Length; k++)
+                {
+                    newFrames[i * 2 + j].m_meshes[k].m_mtl_id = __instance.m_frames[i].m_meshes[k].m_mtl_id;
+                    newFrames[i * 2 + j].m_meshes[k].m_npoly = __instance.m_frames[i].m_meshes[k].m_npoly;
+                    newFrames[i * 2 + j].m_meshes[k].m_vtx = new int[__instance.m_frames[i].m_meshes[k].m_vtx.Length];
+                    string printBuffer = "";
+                    for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
+                    {
+                        if (interpolate && j == 1 && i+1 < __instance.m_frames.Length && __instance.m_frames[i].m_meshes.Length == __instance.m_frames[i+1].m_meshes.Length
+                                                                                      && __instance.m_frames[i].m_meshes[k].m_vtx.Length== __instance.m_frames[i + 1].m_meshes[k].m_vtx.Length)
+                        {
+                            int newIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v] + __instance.m_ssobj.m_nvtx / 2;
+                            int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
+                            int nextIndex = __instance.m_frames[i + 1].m_meshes[k].m_vtx[v];
+                            newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
+                            //float distance = Vector3.Distance(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[newIndex]);
+                            //printBuffer += (nextIndex - oldIndex) +",";
+                            __instance.m_ssobj.m_vtx_array[newIndex] = Vector3.Lerp(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[nextIndex], 0.5f);
+                            __instance.m_ssobj.m_uv_array[newIndex] = __instance.m_ssobj.m_uv_array[oldIndex];
+                            if (__instance.m_ssobj.m_color_array != null)
+                                __instance.m_ssobj.m_color_array[newIndex] = __instance.m_ssobj.m_color_array[oldIndex];
+                        }
+                        else
+                            newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
+                    }
+                    if(printBuffer.Length>0)
+                        Msg(printBuffer+":"+ __instance.m_frames[i].m_meshes[k].m_vtx.Length);
+                }
+            }
+        }
+        __instance.m_frames = newFrames;
+        __instance.m_end_frame = newFrames.Length;
     }
 }
 
@@ -818,23 +881,23 @@ public static class FPSFixAunas2
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
-public static class FPSFixSSOExecter
-{
-    public static bool Prefix(BattleLogic.SSOExecter __instance, List<SSObject> ____obj)
-    {
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-        {
-            foreach(SSObject ssobject in ____obj)
-            {
-                Msg(ssobject.m_fname);
-                ssobject.Draw();
-            }
-            return false;
-        }
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.SSOExecter), "update")]
+//public static class FPSFixSSOExecter
+//{
+//    public static bool Prefix(BattleLogic.SSOExecter __instance, List<SSObject> ____obj)
+//    {
+//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+//        {
+//            foreach(SSObject ssobject in ____obj)
+//            {
+//                Msg(ssobject.m_fname);
+//                ssobject.Draw();
+//            }
+//            return false;
+//        }
+//        return true;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "RollingJumpCharacter")]
 public static class FPSFixBattleWinJump
@@ -1013,9 +1076,7 @@ public static class FPSFixBattleEffectStop
         }
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
         bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW
-                    || phase == BattleEffect.DISP_PHASE.WAIT || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME
-                    || phase == BattleEffect.DISP_PHASE.TOTAL_ECLIPSE
-                    || phase == BattleEffect.DISP_PHASE.SERVANT_UP || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN;
+                    || phase == BattleEffect.DISP_PHASE.WAIT;
 
         if (slow && Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && lastPhase == phase)
         {
@@ -1431,11 +1492,10 @@ public static class FPSFixWeatherEffect
         if (num != before_id)
             return true;
 
-        if(Time.frameCount % (Application.targetFrameRate / 30) == 0)
-        {
+        //if(Time.frameCount % (Application.targetFrameRate / 30) == 0){
             tisou_d.Update();
             tisou_u.Update();
-        }
+        //}
 
         tisou_d.Draw();
         GS.BeginRenderTexture(0);
@@ -2167,6 +2227,7 @@ public static class CommandDrawAll
 
     static void Prefix(ref int ___menuScroll, ref string[] ___commandTouch)
     {
+        ___menuScroll = 0;
         if (___commandTouch.Length < 16)
         {
             ___commandTouch = new string[16];
@@ -2647,16 +2708,16 @@ namespace MassCombat
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update_anim")]
-public static class FPSFixMassCombatAnim
-{
-    public static bool Prefix(MassCombat.MCMain __instance)
-    {
-        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
-            return false;
-        return true;
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update_anim")]
+//public static class FPSFixMassCombatAnim
+//{
+//    public static bool Prefix(MassCombat.MCMain __instance)
+//    {
+//        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+//            return false;
+//        return true;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update")]
 public static class FPSFixMassCombatUpdate
