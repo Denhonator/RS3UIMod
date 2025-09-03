@@ -667,10 +667,35 @@ public static class FPSFixRandomMove
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_gliderspike")]
+public static class FPSFixGliderSpike
+{
+    static Vector2 prevPos = Vector2.zero;
+    static void Prefix(BattleEffect __instance, ref int ___glider_spike_frame_count, List<BattleAction> ___m_cmd_task)
+    {
+        if (Application.targetFrameRate > 30 && ___m_cmd_task[__instance.m_act_cnt]._me.Count>0)
+        {
+            prevPos = __instance.m_position[___m_cmd_task[__instance.m_act_cnt]._me[0]];
+        }
+    }
+
+    static void Postfix(BattleEffect __instance, ref int ___glider_spike_frame_count, List<BattleAction> ___m_cmd_task)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+        {
+            Vector2 curPos = __instance.m_position[___m_cmd_task[__instance.m_act_cnt]._me[0]];
+
+            if((prevPos-curPos).magnitude < 100)
+                __instance.m_position[___m_cmd_task[__instance.m_act_cnt]._me[0]] += (prevPos - curPos) * 0.5f;
+            ___glider_spike_frame_count--;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "gliderspike", "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc" };
+    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc", "mikiri", "tgtmikiri" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -979,6 +1004,13 @@ public static class FPSFixBattleEffectStop
     static BattleEffect.DISP_PHASE lastPhase = BattleEffect.DISP_PHASE.WAIT;
     public static bool Prefix(BattleEffect __instance)
     {
+        if (Application.targetFrameRate > 30)
+        {
+            BattleEffect.EffectSubject.WAIT_DAMAGE = 40U;
+            BattleEffect.EffectSubject.WAIT_MISS = 56U;
+            BattleEffect.EffectSubject.WAIT_HIRAMEKI = 40U;
+            BattleEffect.EffectSubject.WAIT_DEAD_ENEMY = 64U;
+        }
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
         bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW
                     || phase == BattleEffect.DISP_PHASE.WAIT || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME
@@ -999,6 +1031,183 @@ public static class FPSFixBattleEffectStop
         return true;
     }
 }
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "Term")]
+public static class BattleEffectAnimPhaseEnd
+{
+    public static void Postfix(BattleEffect __instance)
+    {
+        if (!__instance.isAnimPhase)
+        {
+            ParamUpMsg.msg.Clear();
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(CreateDamageUi), "Update")]
+public static class FPSFixDamageUI
+{
+    public static void Prefix(CreateDamageUi __instance)
+    {
+        if (Application.targetFrameRate > 30)
+        {
+            List<CreateDamageUi.DamegeInfo> damageInfos = HarmonyLib.Traverse.Create(typeof(CreateDamageUi)).Field("damageInfos").GetValue<List<CreateDamageUi.DamegeInfo>>();
+            foreach (CreateDamageUi.DamegeInfo damegeInfo in damageInfos)
+                damegeInfo.count -= 0.5f;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect.EffectObserver), "resister_action")]
+public static class DisplayParamChange
+{
+    public static void Postfix(BattleAction ba, BattleEffect __instance, List<BattleEffect.EffectSubject> ____eff_subjects)
+    {
+        if (ParamUpMsg.msg.Count == 0)
+            return;
+
+        for(int i = 0; i < ParamUpMsg.msg.Count; i++)
+        {
+            string[] split = ParamUpMsg.msg[i].Split(':');
+            foreach(int target in ba._you)
+            {
+                if (target < 0 || ba._helth[ba._you.IndexOf(target)] == 2)
+                    continue;
+
+                if (ba._me.Count < 1)
+                    return;
+
+                BattleEffect.EffectSubject subject = ____eff_subjects[target];
+                int _own_idx = HarmonyLib.Traverse.Create(subject).Field("_own_idx").GetValue<int>();
+                bool _is_player = HarmonyLib.Traverse.Create(subject).Field("_is_player").GetValue<bool>();
+
+                int ind = _is_player ? ba._me[0] : ba._me[0] - 10;
+
+                //Msg("Count:"+ba._me.Count+","+split[0]+"=="+ba._me[0]+","+split[1]+"=="+target);
+                if (int.Parse(split[0]) == ba._me[0] && int.Parse(split[1]) == target)
+                {
+                    Action action = delegate
+                    {
+                        HarmonyLib.Traverse.Create(typeof(CreateStatusStr)).Field("size").SetValue(15);
+                        List<string> displayParts = new List<string>();
+                        int wordLen = split[2].Length-1;
+                        bool positive = split[2][0] == '+' ? true : false;
+                        for (int p = wordLen; p > 0; p--)
+                        {
+                            displayParts.Add(split[2].Substring(p, 1));
+                        }
+                        Vector2 pos = GameCore.m_battle._effect.m_position[_own_idx] + new Vector2(_is_player ? -15f : 20f, 0f);
+                        CreateStatusStr.DamegeInfo damageInfo = new CreateStatusStr.DamegeInfo();
+                        damageInfo.setBeginPos((int)pos.x + (_is_player ? -5 : 5), (int)pos.y + 10);
+                        damageInfo.isLeft = !_is_player;
+                        string text = "Battle/btl_txt_en/txt_";
+                        for (int k = 0; k < displayParts.Count; k++)
+                        {
+                            EffectDrawImage effectDrawImage = new EffectDrawImage();
+                            effectDrawImage.Initialize(text + displayParts[(_is_player) ? (displayParts.Count - k - 1) : k]);
+                            effectDrawImage.SetColor(positive ? Color.green : Color.red);
+                            effectDrawImage.SetVisible(true);
+                            effectDrawImage.SetScale(0.125f);
+                            damageInfo.font.Add(effectDrawImage);
+                        }
+                        damageInfo.update();
+                        List<CreateStatusStr.DamegeInfo> damageInfos = HarmonyLib.Traverse.Create(typeof(CreateStatusStr)).Field("damageInfos").GetValue<List<CreateStatusStr.DamegeInfo>>();
+                        damageInfos.Add(damageInfo);
+                        HarmonyLib.Traverse.Create(subject).Field("_deque_flag").SetValue(true);
+                    };
+
+                    Queue<Utility_T_H.MethodTimer> _methods = HarmonyLib.Traverse.Create(subject).Field("_methods").GetValue<Queue<Utility_T_H.MethodTimer>>();
+                    _methods.Enqueue(new Utility_T_H.MethodTimer(1U, action));
+                    _methods.Enqueue(new Utility_T_H.MethodTimer(40U, delegate {
+                        HarmonyLib.Traverse.Create(subject).Field("_deque_flag").SetValue(true);
+                    }));
+                    ParamUpMsg.msg.RemoveAt(i);
+                    i--;
+                }
+            }
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.Skill_1on1_Executer), "exec_17_param_up")]
+public static class ParamUpMsg
+{
+    public static List<string> msg = new List<string>();
+    public static void Prefix(BattleLogic.Skill_1on1_Executer __instance, BattleLogic.BattleSkillObject ____skill, int ____skill_lv,
+                                BattleLogic.BattleUnit ____ref_acter, BattleLogic.BattleUnit ____ref_target)
+    {
+        int num = ____skill._hit_correction + ____skill_lv / (____skill._add_eff - 1);
+        string param = "";
+        param += (____skill._effect_value & 4) != 0 ? "DEF" : "";
+        param += (____skill._effect_value & 8) != 0 ? "MDF" : "";
+        param += (____skill._effect_value & 16) != 0 ? "SPD" : "";
+        param += (____skill._effect_value & 32) != 0 ? "STA" : "";
+        param += (____skill._effect_value & 64) != 0 ? "MAG" : "";
+        param += (____skill._effect_value & 128) != 0 ? "STR" : "";
+
+        for (int i = 0; i < param.Length; i += 3)
+        {
+            string toadd = ____ref_acter._unit_id + ":" + ____ref_target._unit_id + ":+" + param.Substring(i,3);
+            if (!msg.Contains(toadd))
+                msg.Add(toadd);
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.Skill_1on1_Executer), "add_eff_param_down")]
+public static class ParamDownMsg
+{
+    static void Prefix()
+    {
+        ;
+    }
+    public static void Postfix(BattleLogic.Skill_1on1_Executer __instance, DataStruct.Skill.skill_add_eff add_eff,
+                                BattleLogic.BattleUnit ____ref_acter, BattleLogic.BattleUnit ____ref_target)
+    {
+        string param = "";
+        param += add_eff._fall_physicdefense > 0 && (____ref_target._defense_manager._physic_def_half_reserved || ____ref_target._defense_manager._physic_def_down_reserved!=0) ? "DEF" : "";
+        param += add_eff._fall_fascination > 0 && ____ref_target._fascination._fall_value_reserved!=0 ? "CHA" : "";
+        param += add_eff._fall_will > 0 && ____ref_target._will._fall_value_reserved!=0 ? "WIL" : "";
+        param += add_eff._fall_force > 0 && ____ref_target._force._fall_value_reserved!=0 ? "MAG" : "";
+        param += add_eff._fall_endure > 0 && ____ref_target._endure._fall_value_reserved!=0 ? "STA" : "";
+        param += add_eff._fall_agility > 0 && ____ref_target._agility._fall_value_reserved!=0 ? "SPD" : "";
+        param += add_eff._fall_dexterity > 0 && ____ref_target._dexterity._fall_value_reserved!=0 ? "DEX" : "";
+        param += add_eff._fall_strength > 0 && ____ref_target._strength._fall_value_reserved!=0 ? "STR" : "";
+
+        for (int i = 0; i < param.Length; i += 3)
+        {
+            string toadd = ____ref_acter._unit_id + ":" + ____ref_target._unit_id + ":-" + param.Substring(i, 3);
+            if (!ParamUpMsg.msg.Contains(toadd))
+                ParamUpMsg.msg.Add(toadd);
+        }
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.Skill_1on1_Executer), "exec_15_param_down")]
+//public static class ParamDownMsg
+//{
+//    public static void Prefix(BattleLogic.Skill_1on1_Executer __instance, BattleLogic.BattleSkillObject ____skill, int ____skill_lv,
+//                                BattleLogic.BattleUnit ____ref_acter, BattleLogic.BattleUnit ____ref_target)
+//    {
+//        int num = ____skill_lv / (____skill._add_eff - 1);
+//        string param = "";
+//        param += (____skill._effect_value & 1) != 0 ? "DEF" : "";
+//        param += (____skill._effect_value & 2) != 0 ? "CHA" : "";
+//        param += (____skill._effect_value & 4) != 0 ? "WIL" : "";
+//        param += (____skill._effect_value & 8) != 0 ? "MAG" : "";
+//        param += (____skill._effect_value & 16) != 0 ? "STA" : "";
+//        param += (____skill._effect_value & 32) != 0 ? "SPD" : "";
+//        param += (____skill._effect_value & 64) != 0 ? "DEX" : "";
+//        param += (____skill._effect_value & 128) != 0 ? "STR" : "";
+//        if (param.Length > 3)
+//            param = "STATS";
+
+//        string toadd = ____ref_acter._unit_id + ":" + ____ref_target._unit_id + ":-" + param + num.ToString();
+//        Msg("param_down: " + toadd);
+//        if (!ParamUpMsg.msg.Contains(toadd))
+//            ParamUpMsg.msg.Add(toadd);
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "StatusUP")]
 public static class FPSFixGrowSpin
