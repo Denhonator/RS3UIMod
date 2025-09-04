@@ -561,16 +561,6 @@ public static class FPSFixAfterActionJump
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_monswinddart")]
-public static class FPSFixWindDart
-{
-    static void Prefix(ref int ___mons_winddart_frame_count)
-    {
-        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
-            ___mons_winddart_frame_count--;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_mons_shippo_calc")]
 public static class FPSFixTailSwipe
 {
@@ -713,6 +703,40 @@ public static class FPSFixRandomMove
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_shokusyu_init")]
+public static class FPSFixTentacle
+{
+    static void Postfix(ref float[] ___addX, ref float[] ___addY, int ___shokusyuNum)
+    {
+        if (Application.targetFrameRate <= 30)
+            return;
+        for(int k = 0; k < ___shokusyuNum; k++)
+        {
+            ___addX[k] *= 0.5f;
+            ___addY[k] *= 0.5f;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_shokusyu_calc")]
+public static class FPSFixTentacle2
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand >= 9)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)code.operand*2);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_gliderspike")]
 public static class FPSFixGliderSpike
 {
@@ -741,7 +765,7 @@ public static class FPSFixGliderSpike
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc", "mikiri", "tgtmikiri" };
+    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc", "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -797,16 +821,6 @@ public static class FPSFixExecCmd
         return true;
     }
 }
-
-//[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_monswinddart")]
-//public static class FPSFixSpecialEff
-//{
-//    public static void Prefix(BattleEffect __instance, ref int ___mons_winddart_frame_count)
-//    {
-//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-//            ___mons_winddart_frame_count = Mathf.Max(___mons_winddart_frame_count - 1, 0);
-//    }
-//}
 
 [HarmonyLib.HarmonyPatch(typeof(EventUtil), "UpdateFade")]
 public static class FPSFixUpdateFade
@@ -951,6 +965,21 @@ public static class FPSFixBattleMove
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "win_jump_tournament")]
+public static class FPSFixTournamentJump
+{
+    public static int tournamentJump = -1;
+    public static void Prefix()
+    {
+        tournamentJump = 0;
+    }
+
+    public static void Postfix()
+    {
+        tournamentJump = -1;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_hermite_move")]
 public static class FPSFixEnemyAppear
 {
@@ -981,10 +1010,22 @@ public static class FPSFixShake
 [HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_frame_act")]
 public static class FPSFixFrameAction
 {
-    public static void Prefix(ref FrameAction fa)
+    static bool additional = false;
+    public static void Prefix(ref FrameAction fa, ref MoveOperate __instance)
     {
-        if(fa._frame>1)
+        if (additional)
+        {
+            additional = false;
+            return;
+        }
+        FPSFixTournamentJump.tournamentJump++;
+        if (fa._frame>1)
             fa._frame *= 2;
+        if (FPSFixTournamentJump.tournamentJump > 4 && FPSFixTournamentJump.tournamentJump < 20)
+        {
+            additional = true;
+            __instance.set_frame_act(new FrameAction(fa._frame - 1, fa._act));
+        }
     }
 }
 
@@ -1217,6 +1258,8 @@ public static class ParamDownMsg
         param += add_eff._fall_agility > 0 && ____ref_target._agility._fall_value_reserved!=0 ? "SPD" : "";
         param += add_eff._fall_dexterity > 0 && ____ref_target._dexterity._fall_value_reserved!=0 ? "DEX" : "";
         param += add_eff._fall_strength > 0 && ____ref_target._strength._fall_value_reserved!=0 ? "STR" : "";
+        if (param.Length >= 21)
+            param = "ALL";
 
         for (int i = 0; i < param.Length; i += 3)
         {
@@ -1243,6 +1286,8 @@ public static class ParamDownMsg2
         param += (____skill._effect_value & 32) != 0 ? "SPD" : "";
         param += (____skill._effect_value & 64) != 0 ? "DEX" : "";
         param += (____skill._effect_value & 128) != 0 ? "STR" : "";
+        if (param.Length >= 21)
+            param = "ALL";
 
         Msg("param_down: ");
         for (int i = 0; i < param.Length; i += 3)
@@ -3111,7 +3156,7 @@ namespace RS3
 
             if (speedupDisplay % 1000 > 0)
             {
-                GS.DrawString((speedupDisplay / 1000) + "x", 2, 0, 0, Color.white, GS.FontEffect.RIM);
+                GS.DrawString((speedupDisplay / 1000) + "x", 4, 0, 0, Color.white, GS.FontEffect.RIM);
                 speedupDisplay--;
             }
         }
