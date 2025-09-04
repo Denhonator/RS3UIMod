@@ -80,14 +80,24 @@ public static class TrackGameStateChanges
 {
     public static bool IgnoreNextStateChange { get; set; } = false;
 
-    public static void SetGameSpeedByState(GameCore.State state) =>
+    public static void SetGameSpeedByState(GameCore.State state)
+    {
+        int curFPS = Application.targetFrameRate;
         Application.targetFrameRate =
         state == GameCore.State.BATTLE ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.battleSpeed) :
         state == GameCore.State.FIELD ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.fieldSpeed) :
         state == GameCore.State.MENU ? 60 :
         state == GameCore.State.TITLE ? 60 :
-        state == GameCore.State.OPENNING ? 60 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed) :
                                         60 * Settings.GetGameSpeedByIndex(Settings.instance.otherSpeed);
+        if (Application.targetFrameRate != curFPS && Application.targetFrameRate > 60)
+        {
+            RS3UI.speedupDisplay = 1000 * Application.targetFrameRate / 60 + Application.targetFrameRate*2;
+        }
+        else
+        {
+            RS3UI.speedupDisplay = 0;
+        }
+    }
 
     public static void IncrementCurrentGameStateSpeed()
     {
@@ -140,33 +150,6 @@ public static class TrackGameStateChanges
         }
 
         IgnoreNextStateChange = false;
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(GameMain), "Update")]
-public static class SpeedOptions
-{
-    static GameObject gui = null;
-    public static void Prefix()
-    {
-        if (Settings.instance.speedrun)
-            return;
-        if (Input.GetKeyDown(KeyCode.PageDown))
-        {
-            TrackGameStateChanges.IncrementCurrentGameStateSpeed();
-        }
-        if (Input.GetKeyDown(KeyCode.Home))
-        {
-            if (!gui)
-            {
-                gui = new GameObject();
-                gui.AddComponent<SeadCategoryGUIController>();
-            }
-            else
-            {
-                GameObject.Destroy(gui);
-            }
-        }
     }
 }
 
@@ -1244,31 +1227,32 @@ public static class ParamDownMsg
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.Skill_1on1_Executer), "exec_15_param_down")]
-//public static class ParamDownMsg
-//{
-//    public static void Prefix(BattleLogic.Skill_1on1_Executer __instance, BattleLogic.BattleSkillObject ____skill, int ____skill_lv,
-//                                BattleLogic.BattleUnit ____ref_acter, BattleLogic.BattleUnit ____ref_target)
-//    {
-//        int num = ____skill_lv / (____skill._add_eff - 1);
-//        string param = "";
-//        param += (____skill._effect_value & 1) != 0 ? "DEF" : "";
-//        param += (____skill._effect_value & 2) != 0 ? "CHA" : "";
-//        param += (____skill._effect_value & 4) != 0 ? "WIL" : "";
-//        param += (____skill._effect_value & 8) != 0 ? "MAG" : "";
-//        param += (____skill._effect_value & 16) != 0 ? "STA" : "";
-//        param += (____skill._effect_value & 32) != 0 ? "SPD" : "";
-//        param += (____skill._effect_value & 64) != 0 ? "DEX" : "";
-//        param += (____skill._effect_value & 128) != 0 ? "STR" : "";
-//        if (param.Length > 3)
-//            param = "STATS";
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.Skill_1on1_Executer), "exec_15_param_down")]
+public static class ParamDownMsg2
+{
+    public static void Prefix(BattleLogic.Skill_1on1_Executer __instance, BattleLogic.BattleSkillObject ____skill, int ____skill_lv,
+                                BattleLogic.BattleUnit ____ref_acter, BattleLogic.BattleUnit ____ref_target)
+    {
+        int num = ____skill_lv / (____skill._add_eff - 1);
+        string param = "";
+        param += (____skill._effect_value & 1) != 0 ? "DEF" : "";
+        param += (____skill._effect_value & 2) != 0 ? "CHA" : "";
+        param += (____skill._effect_value & 4) != 0 ? "WIL" : "";
+        param += (____skill._effect_value & 8) != 0 ? "MAG" : "";
+        param += (____skill._effect_value & 16) != 0 ? "STA" : "";
+        param += (____skill._effect_value & 32) != 0 ? "SPD" : "";
+        param += (____skill._effect_value & 64) != 0 ? "DEX" : "";
+        param += (____skill._effect_value & 128) != 0 ? "STR" : "";
 
-//        string toadd = ____ref_acter._unit_id + ":" + ____ref_target._unit_id + ":-" + param + num.ToString();
-//        Msg("param_down: " + toadd);
-//        if (!ParamUpMsg.msg.Contains(toadd))
-//            ParamUpMsg.msg.Add(toadd);
-//    }
-//}
+        Msg("param_down: ");
+        for (int i = 0; i < param.Length; i += 3)
+        {
+            string toadd = ____ref_acter._unit_id + ":" + ____ref_target._unit_id + ":-" + param.Substring(i, 3);
+            if (!ParamUpMsg.msg.Contains(toadd))
+                ParamUpMsg.msg.Add(toadd);
+        }
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "StatusUP")]
 public static class FPSFixGrowSpin
@@ -3066,6 +3050,7 @@ namespace RS3
 {
     public class RS3UI : MelonMod
     {
+        public static int speedupDisplay = 0;
         public static string windowType = "";
         public static string touchType = "";
         public static int commandY = 83;
@@ -3076,6 +3061,7 @@ namespace RS3
         public static int prints = 0;
         public static int descLineLen = 85;
         public static Dictionary<string, string> replacements = new Dictionary<string, string>();
+        static GameObject gui = null;
 
         public override void OnInitializeMelon()
         {
@@ -3100,10 +3086,33 @@ namespace RS3
 
         public override void OnUpdate()
         {
-            Sys.frametime = (int)(Time.deltaTime*1000);
-            if(Input.GetKeyDown(KeyCode.F1))
+            if (Input.GetKeyDown(KeyCode.F1))
             {
                 prints = (prints + 1) % 3;
+            }
+            if (Input.GetKeyDown(KeyCode.PageDown) || Input.GetKeyDown(KeyCode.JoystickButton9))
+            {
+                TrackGameStateChanges.IncrementCurrentGameStateSpeed();
+            }
+            if (Input.GetKeyDown(KeyCode.Home))
+            {
+                if (!gui)
+                {
+                    gui = new GameObject();
+                    gui.AddComponent<SeadCategoryGUIController>();
+                }
+                else
+                {
+                    GameObject.Destroy(gui);
+                }
+            }
+
+            Sys.frametime = (int)(Time.deltaTime*1000);
+
+            if (speedupDisplay % 1000 > 0)
+            {
+                GS.DrawString((speedupDisplay / 1000) + "x", 2, 0, 0, Color.white, GS.FontEffect.RIM);
+                speedupDisplay--;
             }
         }
     }
