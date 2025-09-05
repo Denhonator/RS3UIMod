@@ -343,13 +343,24 @@ public static class FPSFixd10out
 //    }
 //}
 
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_zoomObj")]
+public static class FPSFixZoom
+{
+    static void Prefix(ref int ___lerpframe)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0 && ___lerpframe > 0)
+            ___lerpframe--;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "Process1Step")]
 public static class FPSFixTest
 {
-    public static bool Prefix(ScriptDrive __instance, ref bool __result)
+    public static bool Prefix(ScriptDrive __instance, ref bool __result, ref string[,] ___r3script, ref int ___currentIndex, ref int ___programCounter)
     {
         __result = false;
-        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0);
+        string command = ___r3script[___currentIndex + ___programCounter, 1];
+        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0 && !command.Contains("zoomObj"));
     }
 }
 
@@ -368,7 +379,7 @@ public static class FPSFixTextFade
         {
             array[0] = (int.Parse(array[0]) * 2).ToString();
         }
-        if(cmd.Contains("ssMovie") && array.Length > 3 && array[2] == "zoomframe")
+        if(cmd.Contains("ssMovie") && array.Length > 3 && (array[2] == "zoomframe" || array[2] == "frame"))
         {
             array[3] = (int.Parse(array[3]) * 2).ToString();
         }
@@ -626,7 +637,7 @@ public static class FPSFixInterpolateSS
 
     public static bool Excluded(string s)
     {
-        return s.Contains("zodiac");
+        return false;
     }
 
     static void Postfix(SSObject.Anime __instance)
@@ -656,6 +667,7 @@ public static class FPSFixInterpolateSS
         SSObject.Frame[] newFrames = new SSObject.Frame[__instance.m_frames.Length * 2];
         for (int i = 0; i < __instance.m_frames.Length; i++)
         {
+            string printBuffer = "";
             for (int j = 0; j < 2; j++)
             {
                 newFrames[i * 2 + j].m_meshes = new SSObject.Poly[__instance.m_frames[i].m_meshes.Length];
@@ -664,15 +676,37 @@ public static class FPSFixInterpolateSS
                     newFrames[i * 2 + j].m_meshes[k].m_mtl_id = __instance.m_frames[i].m_meshes[k].m_mtl_id;
                     newFrames[i * 2 + j].m_meshes[k].m_npoly = __instance.m_frames[i].m_meshes[k].m_npoly;
                     newFrames[i * 2 + j].m_meshes[k].m_vtx = new int[__instance.m_frames[i].m_meshes[k].m_vtx.Length];
-                    string printBuffer = "";
+                    int nextMesh = -1;
+                    if(j == 1 && interpolateThis && i+1 < __instance.m_frames.Length)
+                    {
+                        float minDist = 9999999f;
+                        int minIndex = -1;
+                        for(int k2 = 0; k2 < __instance.m_frames[i + 1].m_meshes.Length; k2++)
+                        {
+                            if (__instance.m_frames[i].m_meshes[k].m_vtx.Length != __instance.m_frames[i + 1].m_meshes[k2].m_vtx.Length)
+                                continue;
+                            float dist = 0;
+                            for(int v=0;v< __instance.m_frames[i].m_meshes[k].m_vtx.Length;v++)
+                                dist += Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i + 1].m_meshes[k2].m_vtx[v]]);
+                            if (dist > 0 && dist < minDist && (__instance.m_frames[i+1].m_meshes[k2].m_vtx[0] - __instance.m_frames[i].m_meshes[k].m_vtx[0])%4==0)
+                            {
+                                minIndex = k2;
+                                minDist = dist;
+                            }
+                        }
+                        if (minDist < 50f)
+                            nextMesh = minIndex;
+                        //if (minDist >= threshold)
+                        //    printBuffer += "frame " + i + " mesh " + k + " minDist " + minDist + "\n";
+                    }
+
                     for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
                     {
-                        if (interpolateThis && j == 1 && i+1 < __instance.m_frames.Length && __instance.m_frames[i].m_meshes.Length == __instance.m_frames[i+1].m_meshes.Length
-                                                            && __instance.m_frames[i].m_meshes[k].m_vtx.Length == __instance.m_frames[i + 1].m_meshes[k].m_vtx.Length)
+                        if (interpolateThis && j == 1 && nextMesh >= 0)
                         {
                             int newIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v] + __instance.m_ssobj.m_nvtx / 2;
                             int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
-                            int nextIndex = __instance.m_frames[i + 1].m_meshes[k].m_vtx[v];
+                            int nextIndex = __instance.m_frames[i + 1].m_meshes[nextMesh].m_vtx[v];
                             newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
                             //float distance = Vector3.Distance(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[newIndex]);
                             //printBuffer += (nextIndex - oldIndex) +",";
@@ -684,10 +718,11 @@ public static class FPSFixInterpolateSS
                         else
                             newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
                     }
-                    if(printBuffer.Length>0)
-                        Msg(printBuffer+":"+ __instance.m_frames[i].m_meshes[k].m_vtx.Length);
                 }
             }
+            if (printBuffer.Length > 0)
+                Msg(printBuffer);
+            printBuffer = "";
         }
         __instance.m_frames = newFrames;
         __instance.m_end_frame = newFrames.Length;
