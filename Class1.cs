@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 //[HarmonyLib.HarmonyPatch(typeof(Il2CppMakimono.AnimationDirector), "GetCurrentState", new Type[] { typeof(int) })]
 //class PlayTime
@@ -318,27 +319,37 @@ public static class FPSFixd10out
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_wait")]
-public static class FPSFixWait2
-{
-    private static int HexStringToInt(string hexstr)
-    {
-        string text = hexstr.ToLower();
-        return int.Parse(text, System.Globalization.NumberStyles.HexNumber);
-    }
+//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_wait")]
+//public static class FPSFixWait2
+//{
+//    private static int HexStringToInt(string hexstr)
+//    {
+//        string text = hexstr.ToLower();
+//        return int.Parse(text, System.Globalization.NumberStyles.HexNumber);
+//    }
 
-    public static void Prefix(ScriptDrive __instance)
+//    public static void Prefix(ScriptDrive __instance)
+//    {
+//        string[] array = HarmonyLib.Traverse.Create(__instance).Field("currentParameter").GetValue<string[]>();
+//        if (array[0][0] == '$')
+//        {
+//            int w = HexStringToInt(array[0].Substring(1)) * 2;
+//            array[0] = "$" + w.ToString("X");
+//        }
+//        else if (array[0][0] >= '0' && array[0][0] <= '9')
+//        {
+//            array[0] = (int.Parse(array[0]) * 2).ToString();
+//        }
+//    }
+//}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "Process1Step")]
+public static class FPSFixTest
+{
+    public static bool Prefix(ScriptDrive __instance, ref bool __result)
     {
-        string[] array = HarmonyLib.Traverse.Create(__instance).Field("currentParameter").GetValue<string[]>();
-        if (array[0][0] == '$')
-        {
-            int w = HexStringToInt(array[0].Substring(1)) * 2;
-            array[0] = "$" + w.ToString("X");
-        }
-        else if (array[0][0] >= '0' && array[0][0] <= '9')
-        {
-            array[0] = (int.Parse(array[0]) * 2).ToString();
-        }
+        __result = false;
+        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0);
     }
 }
 
@@ -400,19 +411,19 @@ public static class FPSFixFadeBattle
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_shootingStar")]
-public static class FPSFixShootingStar
-{
-    public static void Prefix(ScriptDrive __instance)
-    {
-        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
-        {
-            int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
-            if(waitCounter>0)
-                HarmonyLib.Traverse.Create(__instance).Field("waitCounter").SetValue(waitCounter - 1);
-        }
-    }
-}
+//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_shootingStar")]
+//public static class FPSFixShootingStar
+//{
+//    public static void Prefix(ScriptDrive __instance)
+//    {
+//        if ((Time.frameCount % 2) == 0 && Application.targetFrameRate > 30)
+//        {
+//            int waitCounter = HarmonyLib.Traverse.Create(__instance).Field("waitCounter").GetValue<int>();
+//            if(waitCounter>0)
+//                HarmonyLib.Traverse.Create(__instance).Field("waitCounter").SetValue(waitCounter - 1);
+//        }
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_moveKeepDir")]
 public static class FPSFixMoveKeepDir
@@ -442,6 +453,15 @@ public static class FPSFixMoveKeepDir
         }
     }
 }
+
+//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "WaitAndEventEnd")]
+//public static class FPSFixWaitEventEnd
+//{
+//    public static bool Prefix(ref int ___endWaitCounter)
+//    {
+//        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0);
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_stay")]
 public static class FPSFixStay2
@@ -539,7 +559,8 @@ public static class FPSFixCmdData
         string[,] array3 = new string[array.Length, array2.Length*2-1];
         for (int i = 0; i < array.Length; i++)
         {
-            string[] array4 = array[i].Replace(",", ",,").Replace("fadeout:200,,","fadeout:200,").Split(',');
+            //string[] array4 = array[i].Replace(",", ",,").Replace("fadeout:200,,","fadeout:200,").Split(',');
+            string[] array4 = Regex.Replace(array[i], "(,+),", "$1$1,").Split(',');
             for (int j = 0; j < array3.GetLength(1); j++)
             {
                 array3[i, j] = array4.Length > j ? array4[j] : "";
@@ -586,25 +607,13 @@ public static class FPSFixTailSwipe
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "tgt_dmg_calc")]
-public static class FPSFixTailSwipe2
-{
-    static bool Prefix(ref bool __result)
-    {
-        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-        {
-            __result = false;
-            return false;
-        }
-        return true;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(SSObject), "Load", new Type[] { typeof(Stream),typeof(SSObject.SSPreLoad),typeof(bool) })]
 public static class FPSFixInterpolateSS2
 {
     static void Prefix(SSObject __instance)
     {
+        if (RS3UI.prints > 0)
+            Msg(__instance.m_fname);
         FPSFixInterpolateSS.doubled.Remove(__instance.m_fname);
     }
 }
@@ -614,9 +623,16 @@ public static class FPSFixInterpolateSS
 {
     public static bool interpolate = true;
     public static Dictionary<string, bool> doubled = new Dictionary<string, bool>();
+
+    public static bool Excluded(string s)
+    {
+        return s.Contains("zodiac");
+    }
+
     static void Postfix(SSObject.Anime __instance)
     {
-        if (interpolate && !doubled.ContainsKey(__instance.m_ssobj.m_fname))
+        bool interpolateThis = interpolate && !Excluded(__instance.m_ssobj.m_fname);
+        if (interpolateThis && !doubled.ContainsKey(__instance.m_ssobj.m_fname))
         {
             Vector3[] newVertcises = new Vector3[__instance.m_ssobj.m_vtx_array.Length * 2];
             __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, 0);
@@ -651,8 +667,8 @@ public static class FPSFixInterpolateSS
                     string printBuffer = "";
                     for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
                     {
-                        if (interpolate && j == 1 && i+1 < __instance.m_frames.Length && __instance.m_frames[i].m_meshes.Length == __instance.m_frames[i+1].m_meshes.Length
-                                                                                      && __instance.m_frames[i].m_meshes[k].m_vtx.Length== __instance.m_frames[i + 1].m_meshes[k].m_vtx.Length)
+                        if (interpolateThis && j == 1 && i+1 < __instance.m_frames.Length && __instance.m_frames[i].m_meshes.Length == __instance.m_frames[i+1].m_meshes.Length
+                                                            && __instance.m_frames[i].m_meshes[k].m_vtx.Length == __instance.m_frames[i + 1].m_meshes[k].m_vtx.Length)
                         {
                             int newIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v] + __instance.m_ssobj.m_nvtx / 2;
                             int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
@@ -765,7 +781,8 @@ public static class FPSFixGliderSpike
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc", "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc" };
+    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc",
+        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -784,12 +801,13 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe") 
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex") 
             && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
-            int frameIndex = (!cmds_arg.Contains('_') || split[1].Contains('.')) ? 0 :
-                            cmds== "forcesetframe" ? 3 : 1;
+            int frameIndex = cmds == "forcesetframe" || cmds == "mulpal3" ? 3 : 
+                cmds == "mulpal2" ? 2 :
+                (!cmds_arg.Contains('_') || split[1].Contains('.')) ? 0 : 1;
             if (frameIndex < 0 || split[frameIndex][0]>'9')
                 return true;
 
