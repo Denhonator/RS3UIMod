@@ -356,11 +356,15 @@ public static class FPSFixZoom
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "Process1Step")]
 public static class FPSFixTest
 {
+    static bool Exclude(string s)
+    {
+        return s.Contains("zoomObj") || s.Contains("Select");
+    }
     public static bool Prefix(ScriptDrive __instance, ref bool __result, ref string[,] ___r3script, ref int ___currentIndex, ref int ___programCounter)
     {
         __result = false;
         string command = ___r3script[___currentIndex + ___programCounter, 1];
-        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0 && !command.Contains("zoomObj"));
+        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0 && !Exclude(command));
     }
 }
 
@@ -515,21 +519,72 @@ public static class ActionFixes
 //    }
 //}
 
-[HarmonyLib.HarmonyPatch(typeof(DetarameYa), "StateArrowCalc")]
-public static class FPSFixRapidVolley
+[HarmonyLib.HarmonyPatch(typeof(ArrowStorm), "StateArrowCalc")]
+public static class FPSFixArrowStorm
 {
-    public static void Prefix(DetarameYa __instance, ref float ___arrowSpeed)
+    public static void Prefix(ArrowStorm __instance)
     {
-        ___arrowSpeed = 12f * Character.SCALE_X;
+        HarmonyLib.Traverse.Create(__instance).Field("ARROW_SHOT_INTERVAL").SetValue(12);
+        HarmonyLib.Traverse.Create(__instance).Field("arrowSpeed").SetValue(12f * Character.SCALE_X);
+    }
+
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)12);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_7).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)13);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand==6f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 12f);
+            else
+                yield return code;
+        }
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(FlashArrow), "StateArrowCalc")]
-public static class FPSFixFlashArrow
+[HarmonyLib.HarmonyPatch]
+public static class FPSFixArrowStorm2
 {
-    public static void Prefix(FlashArrow __instance, ref float ___arrowSpeed)
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
-        ___arrowSpeed = 12f * Character.SCALE_X;
+        yield return HarmonyLib.AccessTools.Method(typeof(ArrowStorm), "StateMoveBeforeCalc");
+        yield return HarmonyLib.AccessTools.Method(typeof(ArrowStorm), "StateMoveBackCalc");
+        yield return HarmonyLib.AccessTools.Method(typeof(ArrowStorm), "CalcDummyArrow");
+    }
+
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        bool replaced = false;
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode && !replaced)
+            {
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)12);
+                replaced = true;
+            }
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 6f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 12f);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch]
+public static class FPSFixArrows
+{
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        yield return HarmonyLib.AccessTools.Method(typeof(DetarameYa), "StateArrowCalc");
+        yield return HarmonyLib.AccessTools.Method(typeof(FlashArrow), "StateArrowCalc");
+    }
+
+    public static void Prefix(Type __instance, ref float ___arrowSpeed)
+    {
+        if (Application.targetFrameRate > 30)
+            ___arrowSpeed = 12f * Character.SCALE_X;
     }
 }
 
@@ -618,14 +673,35 @@ public static class FPSFixTailSwipe
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(SSObject), "SetCurFrame")]
+public static class FPSFixInterpolateSS3
+{
+    public static bool Excluded(string s)
+    {
+        return s.Contains("hosei");
+    }
+
+    static void Prefix(SSObject __instance, ref int frame)
+    {
+        if (__instance.m_fname != null && !Excluded(__instance.m_fname) && frame > 0)
+        {
+            frame *= 2;
+            if (__instance.m_fname.Contains("rrow"))
+                frame++;
+            Msg("Doubled SetCurFrame to " + frame + " for " + __instance.m_fname);
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(SSObject), "Load", new Type[] { typeof(Stream),typeof(SSObject.SSPreLoad),typeof(bool) })]
 public static class FPSFixInterpolateSS2
 {
-    static void Prefix(SSObject __instance)
+    static void Prefix(SSObject __instance, SSObject.SSPreLoad pdata)
     {
         if (RS3UI.prints > 0)
             Msg(__instance.m_fname);
-        FPSFixInterpolateSS.doubled.Remove(__instance.m_fname);
+        if(pdata == null)
+            FPSFixInterpolateSS.doubled.Remove(__instance.m_fname);
     }
 }
 
@@ -692,6 +768,11 @@ public static class FPSFixInterpolateSS
                             {
                                 minIndex = k2;
                                 minDist = dist;
+                            }
+                            else if (dist == 0)
+                            {
+                                minIndex = -1;
+                                break;
                             }
                         }
                         if (minDist < 50f)
@@ -769,6 +850,16 @@ public static class FPSFixTentacle
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_muhyouken")]
+public static class FPSFixArctic
+{
+    static void Prefix(ref int ___mv_cnt)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            ___mv_cnt--;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_shokusyu_calc")]
 public static class FPSFixTentacle2
 {
@@ -817,7 +908,7 @@ public static class FPSFixGliderSpike
 public static class FPSFixExecCmd
 {
     static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc",
-        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc" };
+        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc", "arrowstormcalc" };
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -836,13 +927,13 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex") 
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake") 
             && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
             int frameIndex = cmds == "forcesetframe" || cmds == "mulpal3" ? 3 : 
                 cmds == "mulpal2" ? 2 :
-                (!cmds_arg.Contains('_') || split[1].Contains('.')) ? 0 : 1;
+                (!cmds_arg.Contains('_') || split[1].Contains('.') || cmds=="quake") ? 0 : 1;
             if (frameIndex < 0 || split[frameIndex][0]>'9')
                 return true;
 
@@ -2011,9 +2102,9 @@ public static class ReplaceTexture
             {
                 if (!Directory.Exists(Path.GetDirectoryName("Extract/" + fname)))
                     Directory.CreateDirectory(Path.GetDirectoryName("Extract/" + fname));
-                if (data == null)
+                if (data == null && !File.Exists("Extract/" + fname))
                     data = Util.falloc(fname);
-                if (data != null)
+                if (data != null && !File.Exists("Extract/" + fname))
                     File.WriteAllBytes("Extract/" + fname, data);
             }
         }
@@ -2790,16 +2881,16 @@ namespace MassCombat
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update_anim")]
-//public static class FPSFixMassCombatAnim
-//{
-//    public static bool Prefix(MassCombat.MCMain __instance)
-//    {
-//        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
-//            return false;
-//        return true;
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update_anim")]
+public static class FPSFixMassCombatAnim
+{
+    public static bool Prefix(MassCombat.MCMain __instance)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+            return false;
+        return true;
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update")]
 public static class FPSFixMassCombatUpdate
@@ -3057,8 +3148,8 @@ public static class TextOutline
         //GS.m_font_scale_y = 2f;
         if (RS3UI.windowType == "CommandSelect")
             return;
-        //if (effect == GS.FontEffect.SHADOW)
-        //    effect = GS.FontEffect.RIM;
+        if ((effect & GS.FontEffect.RIM) == GS.FontEffect.RIM && color.r==0 && color.b==0)
+            effect += GS.FontEffect.SHADOW - GS.FontEffect.RIM;
         if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0)
         {
             effect = GS.FontEffect.RIM_WINDOW;
