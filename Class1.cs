@@ -626,7 +626,7 @@ public static class FPSFixCmdData
         for (int i = 0; i < array.Length; i++)
         {
             //string[] array4 = array[i].Replace(",", ",,").Replace("fadeout:200,,","fadeout:200,").Split(',');
-            string[] array4 = Regex.Replace(array[i], "(,+),", "$1$1,").Split(',');
+            string[] array4 = Regex.Replace(Regex.Replace(array[i], "(,+),", "$1$1,"), "([^,])(,)([^,])", "$1,,$3").Split(',');
             for (int j = 0; j < array3.GetLength(1); j++)
             {
                 array3[i, j] = array4.Length > j ? array4[j] : "";
