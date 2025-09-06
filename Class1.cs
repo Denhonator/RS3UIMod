@@ -637,6 +637,17 @@ public static class FPSFixCmdData
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_trish_pcmodoru")]
+public static class FPSFixTriSh2
+{
+    public static bool Prefix(BattleEffect __instance)
+    {
+        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+            return false;
+        return true;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_pcmodoru")]
 public static class FPSFixAfterActionJump
 {
@@ -683,13 +694,8 @@ public static class FPSFixInterpolateSS3
 
     static void Prefix(SSObject __instance, ref int frame)
     {
-        if (__instance.m_fname != null && !Excluded(__instance.m_fname) && frame > 0)
-        {
-            frame *= 2;
-            if (__instance.m_fname.Contains("rrow"))
-                frame++;
-            Msg("Doubled SetCurFrame to " + frame + " for " + __instance.m_fname);
-        }
+        if (__instance.m_fname.Contains("rrow"))
+            frame += frame+1;
     }
 }
 
@@ -879,6 +885,25 @@ public static class FPSFixTentacle2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_trish_calc")]
+public static class FPSFixTriSh
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 14)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)code.operand * 2);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_gliderspike")]
 public static class FPSFixGliderSpike
 {
@@ -927,7 +952,7 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake") 
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="mulava") 
             && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
@@ -942,7 +967,7 @@ public static class FPSFixExecCmd
                 int frames = int.Parse(split[frameIndex]);
                 if (frames > 1)
                 {
-                    if (frameIndex == 1 && split.Length > 2 && split[0][0] >= '0' && split[0][0] <= '9')
+                    if (frameIndex == 1 && split.Length > 2 && split[0][0] >= '0' && split[0][0] <= '9' && cmds!="mulava")
                         split[0] = (int.Parse(split[0]) * 2).ToString();
                     split[frameIndex] = (frames * 2).ToString();
                     string s = "";
@@ -1110,41 +1135,106 @@ public static class FPSFixBattleMove
 }
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "win_jump_tournament")]
-public static class FPSFixTournamentJump
+public static class FPSFixFrameActionSeq
 {
-    public static int tournamentJump = -1;
+    public static int frameSeq = -1;
     public static void Prefix()
     {
-        tournamentJump = 0;
+        frameSeq = 0;
     }
 
     public static void Postfix()
     {
-        tournamentJump = -1;
+        frameSeq = -1;
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_hermite_move")]
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "excel_move")]
+public static class FPSFixExcelMove
+{
+    public static int ignore = 0;
+    public static int skip = 0;
+
+    public static bool Prefix(BattleEffect __instance, ref List<BattleAction> ___m_cmd_task, int[] ___mul_mv_cnt, ref List<MoveManager> ____player_pos_ctrl)
+    {
+        BattleAction battleAction = ___m_cmd_task[__instance.m_act_cnt];
+        Vector2 nullPos = __instance.GetNullPos(new BattleEffect.BattleEffectEvangelion
+        {
+            idx = battleAction._you[0],
+            nullPosType = BattleEffect.NullPosType.B
+        }, true, 0);
+        Vector2 start_pos = nullPos + __instance._excel_driver_offs;
+        Vector2 base_diff = nullPos - start_pos;
+        HarmonyLib.Traverse.Create(__instance).Field("_frame_counter").SetValue(0);
+        for (int i = 0; i < 3; i++)
+        {
+            ___mul_mv_cnt[i] = 0;
+            int tmp_id = i + 1;
+            Vector2 vector = start_pos + new Vector2(60f * Mathf.Cos((float)(-120 * tmp_id) * 0.017453292f), 60f * Mathf.Sin((float)(-120 * tmp_id) * 0.017453292f));
+            MoveManager moveManager = new MoveManager(vector);
+            ____player_pos_ctrl[battleAction._me[i]] = moveManager;
+            MoveOperate op = new MoveOperate(vector);
+            op.set_wait(5);
+            moveManager.add_move_operate(op);
+            HarmonyLib.Traverse.Create(__instance).Field("_frame_counter").SetValue(-10);
+            int move_frame = 31;
+            op = new MoveOperate(vector);
+            op.set_wait(move_frame);
+            moveManager.add_move_operate(op);
+            skip = 32;
+            for (int j = 0; j < move_frame; j++)
+            {
+                op.set_frame_act(new FrameAction(j, delegate
+                {
+                    float frame = HarmonyLib.Traverse.Create(__instance).Field("_frame_counter").GetValue<int>();
+                    op._pos = new Vector2(start_pos.x + base_diff.x / move_frame * frame + 60f * Mathf.Cos(((-120 * tmp_id) + 360f / move_frame * (-frame)) * 0.017453292f), start_pos.y + 60f * Mathf.Sin(((-120 * tmp_id) + 360f / move_frame * (-frame)) * 0.017453292f));
+                    ___mul_mv_cnt[tmp_id - 1]++;
+                }));
+            }
+            Vector2 last_pos = vector + base_diff;
+            op.set_frame_act(new FrameAction(move_frame, delegate
+            {
+                op._end_pos = last_pos;
+                __instance.m_position[tmp_id - 1] = last_pos;
+                ___mul_mv_cnt[tmp_id - 1] = 17;
+            }));
+        }
+
+        return false;
+    }
+
+    public static void Postfix()
+    {
+        ignore = 0;
+        skip = 0;
+    }
+
+    //static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    //{
+    //    foreach (var code in instructions)
+    //    {
+    //        if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 15)
+    //        {
+    //            HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)60);
+    //            newCode.labels = code.labels;
+    //            yield return newCode;
+    //        }
+    //        else
+    //            yield return code;
+    //    }
+    //}
+}
+
+[HarmonyLib.HarmonyPatch]
 public static class FPSFixEnemyAppear
 {
-    public static void Prefix(ref int frame)
+    public static int frameSeq = -1;
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
-        frame *= 2;
+        yield return HarmonyLib.AccessTools.Method(typeof(MoveOperate), "set_hermite_move");
+        yield return HarmonyLib.AccessTools.Method(typeof(MoveOperate), "set_wait");
+        yield return HarmonyLib.AccessTools.Method(typeof(Shake), "setup");
     }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_wait")]
-public static class FPSFixEnemyAppear2
-{
-    public static void Prefix(ref int frame)
-    {
-        frame *= 2;
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(Shake), "setup")]
-public static class FPSFixShake
-{
     public static void Prefix(ref int frame)
     {
         frame *= 2;
@@ -1155,21 +1245,31 @@ public static class FPSFixShake
 public static class FPSFixFrameAction
 {
     static bool additional = false;
-    public static void Prefix(ref FrameAction fa, ref MoveOperate __instance)
+    public static bool Prefix(ref FrameAction fa, ref MoveOperate __instance)
     {
         if (additional)
         {
             additional = false;
-            return;
+            return true;
         }
-        FPSFixTournamentJump.tournamentJump++;
+        if(FPSFixExcelMove.ignore > 0)
+        {
+            FPSFixExcelMove.ignore--;
+        }
+        else if(FPSFixExcelMove.skip > 0)
+        {
+            FPSFixExcelMove.skip--;
+            return true;
+        }
+        FPSFixFrameActionSeq.frameSeq += FPSFixFrameActionSeq.frameSeq >= 0 ? 1 : 0;
         if (fa._frame>1)
             fa._frame *= 2;
-        if (FPSFixTournamentJump.tournamentJump > 4 && FPSFixTournamentJump.tournamentJump < 20)
+        if (FPSFixFrameActionSeq.frameSeq > 4 && FPSFixFrameActionSeq.frameSeq < 20)
         {
             additional = true;
             __instance.set_frame_act(new FrameAction(fa._frame - 1, fa._act));
         }
+        return true;
     }
 }
 
@@ -1237,6 +1337,7 @@ public static class FPSFixBattleEffectStop
     {
         if (Application.targetFrameRate > 30)
         {
+            //__instance._excel_driver_offs = Vector2.right * 960f / 5f;
             BattleEffect.EffectSubject.WAIT_DAMAGE = 40U;
             BattleEffect.EffectSubject.WAIT_MISS = 56U;
             BattleEffect.EffectSubject.WAIT_HIRAMEKI = 40U;
@@ -1665,10 +1766,10 @@ public static class FPSFixWeatherEffect
         if (num != before_id)
             return true;
 
-        //if(Time.frameCount % (Application.targetFrameRate / 30) == 0){
+        if(Time.frameCount % (Application.targetFrameRate / 30) == 0){
             tisou_d.Update();
             tisou_u.Update();
-        //}
+        }
 
         tisou_d.Draw();
         GS.BeginRenderTexture(0);
