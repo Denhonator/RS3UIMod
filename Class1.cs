@@ -1018,14 +1018,21 @@ public static class FPSFixResonance
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleWork), "info_reset")]
-public static class SparkRate
+//[HarmonyLib.HarmonyPatch(typeof(BattleWork), "info_reset")]
+//public static class SparkRate
+//{
+//    public static void Postfix()
+//    {
+//        BattleWork.hirameki_count = -10000;
+//    }
+//}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_matomonapanti_calc")]
+public static class FPSFixMatomonapanti
 {
-    public static void Postfix()
+    public static bool Prefix()
     {
-        if (Settings.instance.speedrun)
-            return;
-        BattleWork.hirameki_count = -10000;
+        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0);
     }
 }
 
@@ -1249,21 +1256,6 @@ public static class FPSFixBattleMove
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "win_jump_tournament")]
-public static class FPSFixFrameActionSeq
-{
-    public static int frameSeq = -1;
-    public static void Prefix()
-    {
-        frameSeq = 0;
-    }
-
-    public static void Postfix()
-    {
-        frameSeq = -1;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "excel_move")]
 public static class FPSFixExcelMove
 {
@@ -1365,11 +1357,51 @@ public static class FPSFixEnemyAppear
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "win_jump_tournament")]
+public static class FPSFixTournament
+{
+    public static void Prefix()
+    {
+        FPSFixFrameAction.frameSeq = 0;
+        FPSFixFrameAction.addStart = 4;
+        FPSFixFrameAction.addEnd = 19;
+    }
+
+    public static void Postfix()
+    {
+        FPSFixFrameAction.frameSeq = -1;
+        FPSFixFrameAction.addStart = 0;
+        FPSFixFrameAction.addEnd = 0;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "DispPhaseDanceLeafSet")]
+public static class FPSFixDancingLeaf
+{
+    public static void Prefix()
+    {
+        FPSFixFrameAction.frameSeq = 0;
+        FPSFixFrameAction.addStart = 2;
+        FPSFixFrameAction.addEnd = 44;
+    }
+
+    public static void Postfix()
+    {
+        FPSFixFrameAction.frameSeq = -1;
+        FPSFixFrameAction.addStart = 0;
+        FPSFixFrameAction.addEnd = 0;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(MoveOperate), "set_frame_act")]
 public static class FPSFixFrameAction
 {
     static bool additional = false;
     public static int skip = 0;
+    public static int addEnd = 0;
+    public static int addStart = 0;
+    public static int frameSeq = 0;
+
     public static bool Prefix(ref FrameAction fa, ref MoveOperate __instance)
     {
         if (additional)
@@ -1382,10 +1414,10 @@ public static class FPSFixFrameAction
             skip--;
             return true;
         }
-        FPSFixFrameActionSeq.frameSeq += FPSFixFrameActionSeq.frameSeq >= 0 ? 1 : 0;
+        frameSeq += frameSeq >= 0 ? 1 : 0;
         if (fa._frame>1)
             fa._frame *= 2;
-        if (FPSFixFrameActionSeq.frameSeq > 4 && FPSFixFrameActionSeq.frameSeq < 20)
+        if (frameSeq > addStart && frameSeq <= addEnd)
         {
             additional = true;
             __instance.set_frame_act(new FrameAction(fa._frame - 1, fa._act));
@@ -1534,8 +1566,11 @@ public static class FPSFixShadowServant
 public static class FPSFixBattleEffectStop
 {
     static BattleEffect.DISP_PHASE lastPhase = BattleEffect.DISP_PHASE.WAIT;
-    public static bool Prefix(BattleEffect __instance)
+    public static bool Prefix(BattleEffect __instance, ref int ____frame_counter)
     {
+        BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
+        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW || phase == BattleEffect.DISP_PHASE.WAIT
+                 || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN || phase == BattleEffect.DISP_PHASE.SERVANT_UP;
         if (Application.targetFrameRate > 30)
         {
             //__instance._excel_driver_offs = Vector2.right * 960f / 5f;
@@ -1543,10 +1578,9 @@ public static class FPSFixBattleEffectStop
             BattleEffect.EffectSubject.WAIT_MISS = 56U;
             BattleEffect.EffectSubject.WAIT_HIRAMEKI = 40U;
             BattleEffect.EffectSubject.WAIT_DEAD_ENEMY = 64U;
+            if (phase == BattleEffect.DISP_PHASE.DANCE_LEAF_DISP || phase == BattleEffect.DISP_PHASE.WATER_POLE_DISP && Time.frameCount % 2 == 0)
+                ____frame_counter--;
         }
-        BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW || phase == BattleEffect.DISP_PHASE.WAIT
-                 || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN || phase == BattleEffect.DISP_PHASE.SERVANT_UP;
 
         if (phase == BattleEffect.DISP_PHASE.HIRAMEKI_TIME || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME && Application.targetFrameRate > 60)
             Application.targetFrameRate = 60;
