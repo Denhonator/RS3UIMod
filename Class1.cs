@@ -2615,22 +2615,19 @@ public static class TextBoxHeight2
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "AddTouch", new Type[] { typeof(int),typeof(int),typeof(int),typeof(int) })]
 public static class TextBoxHeight3
 {
-    public static void Prefix(ref int element, ref int px, ref int py, ref int width)
+    public static void Prefix(ScriptDrive __instance, ref int element, ref int px, ref int py, ref int width)
     {
-        py -= 15;
+        MessageWindow messageWindow = __instance.messageWindow[__instance.currentWinIndex];
+        py -= 15 + messageWindow.selectBegin*5;
     }
     static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
     {
         foreach (var code in instructions)
         {
             if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand==35)
-            {
                 yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)30);
-            }
             else
-            {
                 yield return code;
-            }
         }
     }
 }
