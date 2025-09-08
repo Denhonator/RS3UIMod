@@ -419,10 +419,10 @@ public static class FPSFixFade
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect.BattleFader), "Fader")]
 public static class FPSFixFadeBattle
 {
-    public static void Prefix(ref int ___fade_end_frame)
+    public static void Prefix(ref int ___fade_frame)
     {
-        int fade_frame = HarmonyLib.Traverse.Create(typeof(GS)).Field("fade_frame").GetValue<int>();
-        HarmonyLib.Traverse.Create(typeof(GS)).Field("fade_frame").SetValue(fade_frame-1);
+        if(Application.targetFrameRate > 30)
+            ___fade_frame--;
     }
 }
 
@@ -519,6 +519,15 @@ public static class ActionFixes
 //    }
 //}
 
+[HarmonyLib.HarmonyPatch(typeof(ArrowStorm.Bow), "GetCurAnimFrame")]
+public static class FPSFixAnimFrame
+{
+    public static void Postfix(ref int __result)
+    {
+        __result /= 2;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ArrowStorm), "StateArrowCalc")]
 public static class FPSFixArrowStorm
 {
@@ -549,8 +558,12 @@ public static class FPSFixArrowStorm2
 {
     public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
+        yield return HarmonyLib.AccessTools.Method(typeof(DetarameYa), "StateMoveBeforeCalc");
+        yield return HarmonyLib.AccessTools.Method(typeof(FlashArrow), "StateMoveBeforeCalc");
         yield return HarmonyLib.AccessTools.Method(typeof(ArrowStorm), "StateMoveBeforeCalc");
         yield return HarmonyLib.AccessTools.Method(typeof(ArrowStorm), "StateMoveBackCalc");
+        yield return HarmonyLib.AccessTools.Method(typeof(DetarameYa), "StateMoveBackCalc");
+        yield return HarmonyLib.AccessTools.Method(typeof(FlashArrow), "StateMoveBackCalc");
         yield return HarmonyLib.AccessTools.Method(typeof(ArrowStorm), "CalcDummyArrow");
     }
 
@@ -581,10 +594,29 @@ public static class FPSFixArrows
         yield return HarmonyLib.AccessTools.Method(typeof(FlashArrow), "StateArrowCalc");
     }
 
-    public static void Prefix(Type __instance, ref float ___arrowSpeed)
+    public static void Prefix(Type __instance, ref float ___arrowSpeed, ref int ___allArrowCounter, ref int ___moveCounter)
     {
         if (Application.targetFrameRate > 30)
+        {
+            if (Time.frameCount % 2 == 0)
+            {
+                ___allArrowCounter--;
+                ___moveCounter--;
+            }
             ___arrowSpeed = 12f * Character.SCALE_X;
+
+        }
+    }
+
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 9)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)18);
+            else
+                yield return code;
+        }
     }
 }
 
@@ -633,7 +665,10 @@ public static class FPSFixCmdData
                 array4 = array[i].Replace(",", ",,").Split(',');
             }
             else
-                array4 = Regex.Replace(Regex.Replace(array[i], "(,+),", "$1$1,"), "([^,])(,)([^,])", "$1,,$3").Split(',');
+            {
+                array4 = array[i].Replace(",", ",,").Replace("fadeout:200,", "fadeout:200").Split(',');
+                //array4 = Regex.Replace(Regex.Replace(array[i], "(,+),", "$1$1,"), "([^,])(,)([^,])", "$1,,$3").Split(',');
+            }
             for (int j = 0; j < array3.GetLength(1); j++)
             {
                 array3[i, j] = array4.Length > j ? array4[j] : "";
@@ -961,11 +996,44 @@ public static class FPSFixFlyingSword
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_kassatu_calc")]
+public static class FPSFixResonance
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            HarmonyLib.CodeInstruction newCode;
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 16f)
+                newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 32f);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 0.01f)
+                newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 0.005f);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 16)
+                newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, 32);
+            else
+                newCode = code;
+            newCode.labels = code.labels;
+            yield return newCode;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleWork), "info_reset")]
+public static class SparkRate
+{
+    public static void Postfix()
+    {
+        if (Settings.instance.speedrun)
+            return;
+        BattleWork.hirameki_count = -10000;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
     static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc",
-        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc", "arrowstormcalc" };
+        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc", "arrowstormcalc"};
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -984,13 +1052,23 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="mulava" || cmds== "avaelbun") 
+        if (cmds.Contains("tex") && !cmds.Contains("calc"))
+        {
+            string[] split = cmds_arg.Split('_');
+            for(int i = 0; i < split.Length; i++)
+            {
+                if (split[i].Length > 0 && split[i][0] >= '0' && split[i][0] <= '9')
+                    split[i] = (int.Parse(split[i]) * 2).ToString();
+            }
+            cmds_arg = string.Join("_", split);
+        }
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds.Contains("contieff") || cmds=="waitframe" || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="camshake" || cmds=="mulava" || cmds== "avaelbun") 
             && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
             int frameIndex = cmds == "forcesetframe" || cmds == "mulpal3" ? 3 : 
                 cmds == "mulpal2" ? 2 :
-                (!cmds_arg.Contains('_') || split[1].Contains('.') || cmds=="quake") ? 0 : 1;
+                (split.Length==1 || !cmds_arg.Contains('_') || split[1].Contains('.') || cmds=="quake" || cmds=="camshake") ? 0 : 1;
             if (frameIndex < 0 || split[frameIndex][0]>'9')
                 return true;
 
@@ -1004,7 +1082,7 @@ public static class FPSFixExecCmd
                         split[1] = split[1].Replace("22.5", "11.25");
                         split[2] = split[2].Replace("90", "45");
                     }
-                    if (frameIndex == 1 && split.Length > 2 && split[0][0] >= '0' && split[0][0] <= '9' && !cmds.Contains("ava"))
+                    if (frameIndex == 1 && split.Length > 2 && split[0][0] >= '0' && split[0][0] <= '9' && !cmds.Contains("ava") && !cmds.Contains("contieff"))
                         split[0] = (int.Parse(split[0]) * 2).ToString();
                     split[frameIndex] = (frames * 2).ToString();
                     string s = "";
@@ -1189,9 +1267,6 @@ public static class FPSFixFrameActionSeq
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "excel_move")]
 public static class FPSFixExcelMove
 {
-    public static int ignore = 0;
-    public static int skip = 0;
-
     public static bool Prefix(BattleEffect __instance, ref List<BattleAction> ___m_cmd_task, int[] ___mul_mv_cnt, ref List<MoveManager> ____player_pos_ctrl)
     {
         BattleAction battleAction = ___m_cmd_task[__instance.m_act_cnt];
@@ -1218,7 +1293,7 @@ public static class FPSFixExcelMove
             op = new MoveOperate(vector);
             op.set_wait(move_frame);
             moveManager.add_move_operate(op);
-            skip = 32;
+            FPSFixFrameAction.skip = 32;
             for (int j = 0; j < move_frame; j++)
             {
                 op.set_frame_act(new FrameAction(j, delegate
@@ -1242,8 +1317,7 @@ public static class FPSFixExcelMove
 
     public static void Postfix()
     {
-        ignore = 0;
-        skip = 0;
+        FPSFixFrameAction.skip = 0;
     }
 
     //static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
@@ -1262,10 +1336,23 @@ public static class FPSFixExcelMove
     //}
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "set_mikiri_move")]
+public static class FPSFixDodgeGlimmer
+{
+    public static int offset = 0;
+    public static void Prefix()
+    {
+        offset = 1;
+    }
+    public static void Postfix()
+    {
+        offset = 0;
+    }
+}
+
 [HarmonyLib.HarmonyPatch]
 public static class FPSFixEnemyAppear
 {
-    public static int frameSeq = -1;
     public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
         yield return HarmonyLib.AccessTools.Method(typeof(MoveOperate), "set_hermite_move");
@@ -1274,7 +1361,7 @@ public static class FPSFixEnemyAppear
     }
     public static void Prefix(ref int frame)
     {
-        frame *= 2;
+        frame = frame*2+(frame==8 ? FPSFixDodgeGlimmer.offset : 0);
     }
 }
 
@@ -1282,6 +1369,7 @@ public static class FPSFixEnemyAppear
 public static class FPSFixFrameAction
 {
     static bool additional = false;
+    public static int skip = 0;
     public static bool Prefix(ref FrameAction fa, ref MoveOperate __instance)
     {
         if (additional)
@@ -1289,13 +1377,9 @@ public static class FPSFixFrameAction
             additional = false;
             return true;
         }
-        if(FPSFixExcelMove.ignore > 0)
+        else if(skip > 0)
         {
-            FPSFixExcelMove.ignore--;
-        }
-        else if(FPSFixExcelMove.skip > 0)
-        {
-            FPSFixExcelMove.skip--;
+            skip--;
             return true;
         }
         FPSFixFrameActionSeq.frameSeq += FPSFixFrameActionSeq.frameSeq >= 0 ? 1 : 0;
@@ -1366,6 +1450,86 @@ public static class FPSFixMenuWait
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "shadow_servant_disappear")]
+public static class FPSFixShadowServant
+{
+    public static bool Prefix(int formIdx, ref Vector2 ___skillServantPos, ref bool ___isSkillServantDepth, ref bool ___isSkillServantDownNow,
+                                ref Character ___skillServant, Color32[] ___skillServantOriPal, Color32[] ___skillServantDefaultPalette, ref List<MoveManager> ____player_pos_ctrl,
+                                Color32[] ___skillServantStartPalette)
+    {
+        ___skillServantPos = new Vector2(GameCore.m_battle._effect.m_position[formIdx].x, GameCore.m_battle._effect.m_position[formIdx].y);
+        int num = Mathf.RoundToInt(___skillServantPos.x);
+        int num2 = Mathf.RoundToInt(___skillServantPos.y);
+        ___isSkillServantDepth = true;
+        ___isSkillServantDownNow = true;
+        ___skillServant = new Character();
+        int obj_no = BattleEffect.m_party_ch[formIdx].m_obj_no;
+        ___skillServantOriPal = Data.GetObjPalette(obj_no);
+        ___skillServant.Init(obj_no);
+        ___skillServant.SetPos(num, num2);
+        ___skillServant.SetPriority(2661);
+        ___skillServant.m_img.SetPalette(___skillServantOriPal);
+        SoundManager.PlaySE(Sound.getSeName(0, 45));
+        Vector2 vector = ___skillServantPos;
+        MoveManager moveManager = new MoveManager(vector);
+        if (____player_pos_ctrl[9] != null)
+        {
+            ____player_pos_ctrl[9].finalize();
+            ____player_pos_ctrl[9] = null;
+        }
+        ____player_pos_ctrl[9] = moveManager;
+        MoveOperate moveOperate = new MoveOperate(vector);
+        moveOperate.set_wait(17);
+        moveManager.add_move_operate(moveOperate);
+        float inv_frame = 0.03125f;
+        FPSFixFrameAction.skip = 45;
+        for(int i = 1; i <= 32; i++)
+        {
+            moveOperate.set_frame_act(new FrameAction(i, delegate
+            {
+                Color32[] pal = GameCore.m_battle._effect.PaletteLerp(___skillServantOriPal, ___skillServantDefaultPalette, inv_frame * i);
+                HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServantPalette").SetValue(pal);
+                Character skillServant = HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServant").GetValue<Character>();
+                skillServant.m_img.SetPalette(pal);
+            }));
+        }
+        
+        moveOperate = new MoveOperate(vector);
+        Vector2 vector2 = new Vector2((float)GameCore.m_battle._effect.partypos[formIdx].x, (float)GameCore.m_battle._effect.partypos[formIdx].y + 60f);
+        moveOperate.set_hermite_move(vector, vector2, Vector2.up, Vector2.up, 28, time_curve_ptn.NORMAL);
+        inv_frame = 0.083333333f;
+        for (int i = 1; i <= 12; i++)
+        {
+            moveOperate.set_frame_act(new FrameAction(i, delegate
+            {
+                Color32[] pal = GameCore.m_battle._effect.PaletteLerp(___skillServantDefaultPalette, ___skillServantStartPalette, inv_frame * i);
+                HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServantPalette").SetValue(pal);
+                Character skillServant = HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServant").GetValue<Character>();
+                skillServant.m_img.SetPalette(pal);
+            }));
+        }
+        moveOperate.set_frame_act(new FrameAction(57, delegate
+        {
+            SoundManager.StopSE();
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("isSkillServantDepth").SetValue(false);
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("isSkillServantUpNow").SetValue(false);
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("isSkillServantDownNow").SetValue(false);
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("isSkillServantNext").SetValue(false);
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("m_disp_phase").SetValue(6);
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServantPos").SetValue(Vector2.zero);
+            Character skillServant = HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServant").GetValue<Character>();
+            skillServant.Term();
+            HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("skillServant").SetValue(null);
+        }));
+        moveManager.add_move_operate(moveOperate);
+        return false;
+    }
+    static void Postfix()
+    {
+        FPSFixFrameAction.skip = 0;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
 public static class FPSFixBattleEffectStop
 {
@@ -1381,9 +1545,10 @@ public static class FPSFixBattleEffectStop
             BattleEffect.EffectSubject.WAIT_DEAD_ENEMY = 64U;
         }
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW
-                    || phase == BattleEffect.DISP_PHASE.WAIT;
-        if(phase == BattleEffect.DISP_PHASE.HIRAMEKI_TIME || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME && Application.targetFrameRate > 60)
+        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW || phase == BattleEffect.DISP_PHASE.WAIT
+                 || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN || phase == BattleEffect.DISP_PHASE.SERVANT_UP;
+
+        if (phase == BattleEffect.DISP_PHASE.HIRAMEKI_TIME || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME && Application.targetFrameRate > 60)
             Application.targetFrameRate = 60;
         else if(phase == BattleEffect.DISP_PHASE.TERMINAL)
             TrackGameStateChanges.SetGameSpeedByState(GameCore.m_state);
@@ -1808,7 +1973,7 @@ public static class FPSFixWeatherEffect
         if (num != before_id)
             return true;
 
-        if(Time.frameCount % (Application.targetFrameRate / 30) == 0){
+        if(Time.frameCount % (Application.targetFrameRate / 60) == 0){
             tisou_d.Update();
             tisou_u.Update();
         }
@@ -2527,6 +2692,7 @@ public static class CommandDrawAll
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PushDownButton");
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawCommandSkill");
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawCommnadSpell");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawMaterialSkill");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "SetMenuScroll");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PushDownButton");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PageDrawBackPack");
@@ -2538,6 +2704,7 @@ public static class CommandDrawAll
         yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawFormationSkill");
         yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawCommandSpell");
         yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawCommandSkill");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDrawCommandMaterialArt");
         yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommanderFormationText");
     }
 
@@ -2655,28 +2822,6 @@ public static class PopupMessages
             WordCountX = lines[1].Length / 2;
     }
 }
-
-//[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { typeof(int),typeof(int) })]
-//public static class CompactUI7
-//{
-//    public static void Postfix(int WordCountX, int WordCountY, ref CVariableMessagePlus __instance)
-//    {
-//        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-//        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(WordCountX,10) * 3 / 2, (WordCountY + 1) * GS.StrDot("M") * 3 / 2);
-//    }
-//}
-
-//[HarmonyLib.HarmonyPatch(typeof(CVariableMessagePlus), "SetWindowSize", new Type[] { })]
-//public static class CompactUI8
-//{
-//    public static void Postfix(ref CVariableMessagePlus __instance)
-//    {
-//        CVariableWindow m_Window = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
-//        int m_WordCountX = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountX").GetValue<int>();
-//        int m_WordCountY = HarmonyLib.Traverse.Create(__instance).Field("m_WordCountY").GetValue<int>();
-//        m_Window.SetSize(GS.StrDot("M") * Mathf.Max(m_WordCountX, 10) * 3 / 2, (m_WordCountY+1) * GS.StrDot("M") * 3 / 2);
-//    }
-//}
 
 [HarmonyLib.HarmonyPatch(typeof(CommandCursor), "SetCursor", new Type[] { typeof(string[]), typeof(string) })]
 public static class CursorPositionCommand
