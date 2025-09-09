@@ -284,16 +284,6 @@ public static class FPSFixMenuTextBlink
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(Field), "SetEventScroll")]
-public static class FPSFixEventScroll
-{
-    public static void Prefix(ref int x, ref int y, ref int frame, Field __instance)
-    {
-        if(Application.targetFrameRate>30)
-            frame *= 2;
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(Field.AbissEvent), "Update")]
 public static class FPSFixAbiss
 {
@@ -1144,14 +1134,13 @@ public static class FPSFixUpdateFade
 [HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update")]
 public static class FPSFixSpecialEff
 {
-    static float lastInv = 0f;
-    public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, 
-        ref Action ____update_ptn, ref Vector4 ____add_raster_y, ref Vector4 ____raster_param_y)
+    public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, ref float ____dt, ref Action ____update_ptn)
     {
-        if(____inv_time != lastInv && Application.targetFrameRate > 30)
+        if(____dt == 0f && Application.targetFrameRate > 30 && ____update_ptn.Method.Name != "update_none")
         {
             ____inv_time *= 0.5f;
-            lastInv = ____inv_time;
+            if(RS3UI.prints>0)
+                Msg(____update_ptn.Method.Name);
         }
         if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
         {
@@ -1181,8 +1170,10 @@ public static class FPSFixAunas
     {
         foreach (var code in instructions)
         {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 0.00390625f)
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && ((Single)code.operand == 0.00390625f))
                 yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, (Single)code.operand*0.5f);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_4);
             else
                 yield return code;
         }
@@ -1204,28 +1195,12 @@ public static class FPSFixAunas2
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update_lastboss_2_a_learp")]
-public static class FPSFixLastBoss
-{
-    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
-    {
-        foreach (var code in instructions)
-        {
-            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
-                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_4);
-            else
-                yield return code;
-        }
-    }
-}
-
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "appear_order_p_last")]
 public static class FPSFixFinalBossAppear
 {
     public static int slowdown = 0;
     static void Prefix()
     {
-        Msg("Start slowdown");
         slowdown = 170;
     }
 }
@@ -1404,13 +1379,15 @@ public static class FPSFixDodgeGlimmer
 }
 
 [HarmonyLib.HarmonyPatch]
-public static class FPSFixEnemyAppear
+public static class FPSFixFrameTimings
 {
     public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
         yield return HarmonyLib.AccessTools.Method(typeof(MoveOperate), "set_hermite_move");
         yield return HarmonyLib.AccessTools.Method(typeof(MoveOperate), "set_wait");
         yield return HarmonyLib.AccessTools.Method(typeof(Shake), "setup");
+        yield return HarmonyLib.AccessTools.Method(typeof(Flash), "setup");
+        yield return HarmonyLib.AccessTools.Method(typeof(Field), "SetEventScroll");
     }
     public static void Prefix(ref int frame)
     {
@@ -1883,8 +1860,7 @@ public static class FPSFixBgFader
 
     public static void Prefix(ref int ___bgFadeFrame)
     {
-        Msg("BgFader");
-        if (Application.targetFrameRate > 30) ;
+        if (Application.targetFrameRate > 30)
             ___bgFadeFrame--;
     }
 }
