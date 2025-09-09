@@ -771,6 +771,7 @@ public static class FPSFixInterpolateSS
         {
             Vector3[] newVertcises = new Vector3[__instance.m_ssobj.m_vtx_array.Length * 2];
             __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, 0);
+            __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, newVertcises.Length/2);
             __instance.m_ssobj.m_vtx_array = newVertcises;
 
             Vector2[] newUV = new Vector2[__instance.m_ssobj.m_uv_array.Length * 2];
@@ -791,6 +792,7 @@ public static class FPSFixInterpolateSS
         SSObject.Frame[] newFrames = new SSObject.Frame[__instance.m_frames.Length * 2];
         for (int i = 0; i < __instance.m_frames.Length; i++)
         {
+            int i2 = (i + 1) % __instance.m_frames.Length;
             string printBuffer = "";
             for (int j = 0; j < 2; j++)
             {
@@ -801,34 +803,41 @@ public static class FPSFixInterpolateSS
                     newFrames[i * 2 + j].m_meshes[k].m_npoly = __instance.m_frames[i].m_meshes[k].m_npoly;
                     newFrames[i * 2 + j].m_meshes[k].m_vtx = new int[__instance.m_frames[i].m_meshes[k].m_vtx.Length];
                     int nextMesh = -1;
-                    if(j == 1 && interpolateThis && i+1 < __instance.m_frames.Length)
+                    if(j == 1 && interpolateThis)
                     {
                         float minDist = 9999999f;
                         int minIndex = -1;
-                        for(int k2 = 0; k2 < __instance.m_frames[i + 1].m_meshes.Length; k2++)
+                        for(int k2 = 0; k2 < __instance.m_frames[i2].m_meshes.Length; k2++)
                         {
-                            if (__instance.m_frames[i].m_meshes[k].m_vtx.Length != __instance.m_frames[i + 1].m_meshes[k2].m_vtx.Length)
+                            if (__instance.m_frames[i].m_meshes[k].m_vtx.Length != __instance.m_frames[i2].m_meshes[k2].m_vtx.Length
+                                || __instance.m_frames[i].m_meshes[k].m_npoly != __instance.m_frames[i2].m_meshes[k2].m_npoly)
                                 continue;
-                            float dist = 0;
+                            float dist = 0f;
                             for(int v=0;v< __instance.m_frames[i].m_meshes[k].m_vtx.Length;v++)
-                                dist += Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i + 1].m_meshes[k2].m_vtx[v]]);
-                            if (dist > 0 && dist < minDist && (__instance.m_frames[i+1].m_meshes[k2].m_vtx[0] - __instance.m_frames[i].m_meshes[k].m_vtx[0])%4==0)
+                                dist = Mathf.Max(Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v]]), dist);
+                            //dist /= __instance.m_frames[i].m_meshes[k].m_vtx.Length;
+                            if (dist > 0 && dist < minDist && __instance.m_ssobj.m_uv_array[__instance.m_frames[i].m_meshes[k].m_vtx[0]] == __instance.m_ssobj.m_uv_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[0]])
                             {
                                 minIndex = k2;
                                 minDist = dist;
                             }
-                            else if (dist == 0)
+                            else if (dist <= 0f)
                             {
                                 minIndex = -1;
                                 break;
                             }
                         }
-                        if (minDist < 100f)
+                        if (minDist < 5f)
                         {
                             nextMesh = minIndex;
-                            //if (__instance.m_ssobj.m_mtl[__instance.m_frames[i].m_meshes[k].m_mtl_id].mainTexture.name != __instance.m_ssobj.m_mtl[__instance.m_frames[i + 1].m_meshes[nextMesh].m_mtl_id].mainTexture.name)
-                            //    printBuffer += __instance.m_ssobj.m_mtl[__instance.m_frames[i].m_meshes[k].m_mtl_id].mainTexture.name + " to " + __instance.m_ssobj.m_mtl[__instance.m_frames[i + 1].m_meshes[nextMesh].m_mtl_id].mainTexture.name+ "\n";
                         }
+                        //else if (minDist < 300f && minIndex >= 0)
+                        //{
+                        //    printBuffer += __instance.m_frames[i2].m_meshes[minIndex].m_npoly + " Frame " + i + " to " + i2 + ": ";
+                        //    foreach(int v in __instance.m_frames[i2].m_meshes[minIndex].m_vtx)
+                        //        printBuffer += __instance.m_ssobj.m_vtx_array[v] + ", ";
+                        //    printBuffer += "\n";
+                        //}
                     }
 
                     for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
@@ -837,7 +846,14 @@ public static class FPSFixInterpolateSS
                         {
                             int newIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v] + __instance.m_ssobj.m_nvtx / 2;
                             int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
-                            int nextIndex = __instance.m_frames[i + 1].m_meshes[nextMesh].m_vtx[v];
+                            int nextIndex = __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[v];
+
+                            //Sometimes coordinates may be shared...
+                            if(__instance.m_ssobj.m_vtx_array[newIndex] != __instance.m_ssobj.m_vtx_array[oldIndex])
+                            {
+                                newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
+                                continue;
+                            }
                             newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
                             //float distance = Vector3.Distance(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[newIndex]);
                             //printBuffer += (nextIndex - oldIndex) +",";
@@ -1971,18 +1987,16 @@ public static class FPSFixBuneSky
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "change_last_bg_to_eclipse")]
+[HarmonyLib.HarmonyPatch]
 public static class RasterParameter
 {
-    public static void Postfix(BattleLogic.BattleScene __instance)
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
-        RS3UI.rasterparameter = new Vector2(BattleLogic.BattleScene._raster_parameter_vx, BattleLogic.BattleScene._raster_parameter_vy);
+        yield return HarmonyLib.AccessTools.Method(typeof(BattleLogic.BattleScene), "change_last_bg_to_eclipse");
+        yield return HarmonyLib.AccessTools.Method(typeof(BattleLogic.BattleScene), "change_last_bg_to_normal");
+        yield return HarmonyLib.AccessTools.Method(typeof(BattleLogic.BattleScene), "init_bg");
     }
-}
 
-[HarmonyLib.HarmonyPatch(typeof(BattleLogic.BattleScene), "change_last_bg_to_normal")]
-public static class RasterParameter2
-{
     public static void Postfix(BattleLogic.BattleScene __instance)
     {
         RS3UI.rasterparameter = new Vector2(BattleLogic.BattleScene._raster_parameter_vx, BattleLogic.BattleScene._raster_parameter_vy);
