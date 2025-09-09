@@ -1162,13 +1162,30 @@ public static class FPSFixSpecialEff
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update_aunasu_1")]
+[HarmonyLib.HarmonyPatch]
 public static class FPSFixAunas
 {
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        yield return HarmonyLib.AccessTools.Method(typeof(SpecialEffMonster), "update_aunasu_1");
+        yield return HarmonyLib.AccessTools.Method(typeof(SpecialEffMonster), "update_lastboss_1_before_a_learp");
+        yield return HarmonyLib.AccessTools.Method(typeof(SpecialEffMonster), "update_lastboss_2_a_learp");
+        yield return HarmonyLib.AccessTools.Method(typeof(SpecialEffMonster), "update_faruneusu_3_raster");
+    }
     public static void Prefix(ref Vector4 ____raster_param_y, Vector4 ____add_raster_y)
     {
         if(Application.targetFrameRate>30)
             ____raster_param_y -= ____add_raster_y * 0.5f;
+    }
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 0.00390625f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, (Single)code.operand*0.5f);
+            else
+                yield return code;
+        }
     }
 }
 
@@ -1184,6 +1201,32 @@ public static class FPSFixAunas2
             else
                 yield return code;
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update_lastboss_2_a_learp")]
+public static class FPSFixLastBoss
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_2).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_4);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "appear_order_p_last")]
+public static class FPSFixFinalBossAppear
+{
+    public static int slowdown = 0;
+    static void Prefix()
+    {
+        Msg("Start slowdown");
+        slowdown = 170;
     }
 }
 
@@ -1580,6 +1623,19 @@ public static class FPSFixShadowServant
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "Update")]
+public static class FPSFixLastBossParty
+{
+    static void Prefix(ref int ____frame_counter)
+    {
+        if(Application.targetFrameRate>30 && Time.frameCount % 2 == 0 && FPSFixFinalBossAppear.slowdown > 0)
+        {
+            FPSFixFinalBossAppear.slowdown--;
+            ____frame_counter--;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "animation")]
 public static class FPSFixBattleEffectStop
 {
@@ -1596,8 +1652,10 @@ public static class FPSFixBattleEffectStop
             BattleEffect.EffectSubject.WAIT_MISS = 56U;
             BattleEffect.EffectSubject.WAIT_HIRAMEKI = 40U;
             BattleEffect.EffectSubject.WAIT_DEAD_ENEMY = 64U;
-            if (phase == BattleEffect.DISP_PHASE.DANCE_LEAF_DISP || phase == BattleEffect.DISP_PHASE.WATER_POLE_DISP && Time.frameCount % 2 == 0)
+            if ((phase == BattleEffect.DISP_PHASE.DANCE_LEAF_DISP || phase == BattleEffect.DISP_PHASE.WATER_POLE_DISP) && Time.frameCount % 2 == 0)
+            {
                 ____frame_counter--;
+            }
         }
 
         if (phase == BattleEffect.DISP_PHASE.HIRAMEKI_TIME || phase == BattleEffect.DISP_PHASE.MIKIRI_HIRAMEKI_TIME && Application.targetFrameRate > 60)
