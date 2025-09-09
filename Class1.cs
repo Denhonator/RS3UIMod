@@ -823,10 +823,12 @@ public static class FPSFixInterpolateSS
                                 break;
                             }
                         }
-                        if (minDist < 50f)
+                        if (minDist < 100f)
+                        {
                             nextMesh = minIndex;
-                        //if (minDist >= threshold)
-                        //    printBuffer += "frame " + i + " mesh " + k + " minDist " + minDist + "\n";
+                            //if (__instance.m_ssobj.m_mtl[__instance.m_frames[i].m_meshes[k].m_mtl_id].mainTexture.name != __instance.m_ssobj.m_mtl[__instance.m_frames[i + 1].m_meshes[nextMesh].m_mtl_id].mainTexture.name)
+                            //    printBuffer += __instance.m_ssobj.m_mtl[__instance.m_frames[i].m_meshes[k].m_mtl_id].mainTexture.name + " to " + __instance.m_ssobj.m_mtl[__instance.m_frames[i + 1].m_meshes[nextMesh].m_mtl_id].mainTexture.name+ "\n";
+                        }
                     }
 
                     for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
@@ -2694,9 +2696,15 @@ public static class FPSFixBattleMess
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "CommanderTacticsText")]
+[HarmonyLib.HarmonyPatch]
 public static class CommanderTacticsDrawAll
 {
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "CommanderTacticsText");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommanderTacticsText");
+    }
+
     static void Prefix(int ___state)
     {
         RS3UI.windowType = "Command";
@@ -2765,15 +2773,24 @@ public static class CommandDrawAll
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(SarahCommander), "SetWindowSize", new Type[] { })]
+public static class WindowSizeSarah
+{
+    public static bool Prefix(int ___menuElement, ref BattleCommandWindow ___commandWindow)
+    {
+        ___commandWindow.SetWindowSize(270, 16 + ___menuElement * 26);
+        ___commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
+        return false;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(CommandMode), "SetWindowSize", new Type[] { })]
 public static class WindowSizeCommand
 {
-    public static bool Prefix(CommandMode __instance)
+    public static bool Prefix(int ___menuElement, ref BattleCommandWindow ___window)
     {
-        int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
-        BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("window").GetValue<BattleCommandWindow>();
-        commandWindow.SetWindowSize(270, 16 + menuElement * 26);
-        commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
+        ___window.SetWindowSize(270, 16 + ___menuElement * 26);
+        ___window.SetWindowPos(55, RS3UI.commandY - 9);
         return false;
     }
 }
@@ -2781,25 +2798,10 @@ public static class WindowSizeCommand
 [HarmonyLib.HarmonyPatch(typeof(CommanderMode), "SetWindowSize", new Type[] { })]
 public static class WindowSizeCommander
 {
-    public static bool Prefix(CommanderMode __instance)
+    public static bool Prefix(int ___menuElement, ref BattleCommandWindow ___commandWindow)
     {
-        int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
-        BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("commandWindow").GetValue<BattleCommandWindow>();
-        commandWindow.SetWindowSize(260, 16 + menuElement * 26);
-        commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
-        return false;
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "SetWindowSize", new Type[] { })]
-public static class WindowSizeSarah
-{
-    public static bool Prefix(CommanderMode __instance)
-    {
-        int menuElement = HarmonyLib.Traverse.Create(__instance).Field("menuElement").GetValue<int>();
-        BattleCommandWindow commandWindow = HarmonyLib.Traverse.Create(__instance).Field("commandWindow").GetValue<BattleCommandWindow>();
-        commandWindow.SetWindowSize(260, 16 + menuElement * 26);
-        commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
+        ___commandWindow.SetWindowSize(260, 16 + ___menuElement * 26);
+        ___commandWindow.SetWindowPos(55, RS3UI.commandY - 9);
         return false;
     }
 }
@@ -2834,6 +2836,18 @@ public static class PageNameSizeCommand
 public static class PageNameSizeCommander
 {
     public static void Prefix(CommanderMode __instance)
+    {
+        CommanderPageNameWin cmdPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("cmdPageNameWindow").GetValue<CommanderPageNameWin>();
+        CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(cmdPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
+        cVariableWindow.SetPos(55, 20);
+        cVariableWindow.SetSize(370, 32);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(SarahCommander), "Update", new Type[] { })]
+public static class PageNameSizeSarah
+{
+    public static void Prefix(SarahCommander __instance)
     {
         CommanderPageNameWin cmdPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("cmdPageNameWindow").GetValue<CommanderPageNameWin>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(cmdPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
@@ -3037,14 +3051,10 @@ public static class TextPosition
             _x -= 125;
             for (int i = 0; i < 16; i++)
             {
-                if (_y == 126 + i * 40)
-                {
+                if (_y == (GameCore.m_userProfile.language == 1 ? 126 : 120) + i * 40)
                     _y = RS3UI.commandY + i * 26;
-                }
-                else if (_y == 128 + i * 40)
-                {
+                else if (_y == (GameCore.m_userProfile.language == 1 ? 128 : 123) + i * 40)
                     _y = RS3UI.commandY + 2 + i * 26;
-                }
             }
             if (str.Length >= 18)
             {
@@ -3366,28 +3376,19 @@ public static class HideExtraButtons3
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(CommandPageNameWindow), "Draw")]
-public static class CommandDraw3
+[HarmonyLib.HarmonyPatch]
+public static class CommandDrawPageName
 {
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+    {
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandPageNameWindow), "Draw");
+        yield return HarmonyLib.AccessTools.Method(typeof(BattleFormationWindow), "Update");
+    }
     public static void Prefix()
     {
         RS3UI.windowType = "PageName";
     }
     public static void Postfix()
-    {
-        RS3UI.windowType = "";
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(BattleFormationWindow), "Update")]
-public static class FormationChooseWindow2
-{
-    public static void Prefix(BattleFormationWindow __instance)
-    {
-        RS3UI.windowType = "PageName";
-    }
-
-    public static void Postfix(BattleFormationWindow __instance)
     {
         RS3UI.windowType = "";
     }
@@ -3402,8 +3403,10 @@ public static class CommandDraw
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "NormalCommandFixedDraw");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "CommanderNormalText");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "CommanderFormationText");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommanderFormationText");
         yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommanderNormalText");
         yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "CommandNormalText");
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "PageDraw");
     }
     public static void Prefix()
     {
@@ -3602,6 +3605,10 @@ namespace RS3
             {
                 TrackGameStateChanges.IncrementCurrentGameStateSpeed();
             }
+            if (Input.GetKey(KeyCode.End))
+                Application.targetFrameRate = 2000;
+            else if (Application.targetFrameRate == 2000)
+                TrackGameStateChanges.SetGameSpeedByState(GameCore.m_state);
             if (Input.GetKeyDown(KeyCode.Home))
             {
                 if (!gui)
