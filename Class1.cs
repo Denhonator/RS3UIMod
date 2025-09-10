@@ -358,6 +358,15 @@ public static class FPSFixTest
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_endingStatus")]
+public static class FinalStatsFix
+{
+    public static void Prefix(ref int opt)
+    {
+        opt = 1;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "DispatchCommand")]
 public static class FPSFixTextFade
 {
@@ -1452,6 +1461,7 @@ public static class FPSFixFrameTimings
         yield return HarmonyLib.AccessTools.Method(typeof(Shake), "setup");
         yield return HarmonyLib.AccessTools.Method(typeof(Flash), "setup");
         yield return HarmonyLib.AccessTools.Method(typeof(Field), "SetEventScroll");
+        yield return HarmonyLib.AccessTools.Method(typeof(BattleEffectLastBossDead), "SetStart");
     }
     public static void Prefix(ref int frame)
     {
@@ -1991,18 +2001,23 @@ public static class FPSFixShip2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "UpdateShake")]
+public static class FPSFixShakeCutscene2
+{
+    public static bool Prefix()
+    {
+        if (Time.frameCount % (Application.targetFrameRate / 30) != 0)
+            return false;
+        return true;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_shake")]
 public static class FPSFixShakeCutscene
 {
     public static void Prefix(ref string[] ___currentParameter, ScriptDrive __instance)
     {
         ___currentParameter[0] = ___currentParameter[0].Replace("midium", "medium");
-    }
-
-    public static void Postfix(ScriptDrive __instance)
-    {
-        if(Application.targetFrameRate>30)
-            __instance.shakeInterval *= 2;
     }
 }
 
