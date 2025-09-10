@@ -377,6 +377,13 @@ public static class FPSFixTextFade
         {
             array[3] = (int.Parse(array[3]) * 2).ToString();
         }
+        if (cmd.Contains("staff"))
+        {
+            HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_zoom_frame").SetValue(60);
+            HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_disp_frame").SetValue(120);
+            HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_fade_frame").SetValue(60);
+            HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_scroll_speed").SetValue(2);
+        }
     }
 }
 
@@ -728,6 +735,63 @@ public static class FPSFixInterpolateSS3
     {
         if (__instance.m_fname.Contains("rrow"))
             frame += frame+1;
+        else if (!Excluded(__instance.m_fname))
+            frame *= 2;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_yaminotubasa_init")]
+public static class FPSFixLastBossTransform
+{
+    public static void Postfix(ref int ___frame_cnt)
+    {
+        if (___frame_cnt == 35)
+            ___frame_cnt = 71;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_jyuuma_calc")]
+public static class FPSFixLastBossTransform2
+{
+    public static bool Prefix(ref List<Monster> ___m_monsters, ref List<string> ___m_cmds, ref List<string> ___m_cmds_arg, ref bool __result)
+    {
+        if (___m_monsters[0].GetCurFrame() == 4)
+            SoundManager.PlaySE(Sound.getSeName(0, 42));
+        else if (___m_monsters[0].GetCurFrame() == 108)
+            SoundManager.PlaySE(Sound.getSeName(0, 38));
+        else if (___m_monsters[0].GetCurFrame() == 280)
+        {
+            SoundManager.StopSE();
+            SoundManager.PlaySE(Sound.getSeName(0, 234));
+        }
+        if (___m_monsters[0].IsEnd())
+        {
+            ___m_monsters[0].PlayBattleEff(0);
+            ___m_cmds.Add("end");
+            ___m_cmds_arg.Add(string.Empty);
+            __result = true;
+        }
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_last_boss_lose_calc")]
+public static class FPSFixLastBossLose
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && ((Single)code.operand == 0.002f || (Single)code.operand == 0.0005f))
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, (Single)code.operand * 0.5f);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
     }
 }
 
@@ -1048,7 +1112,7 @@ public static class FPSFixMatomonapanti
 public static class FPSFixExecCmd
 {
     static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc",
-        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc", "arrowstormcalc"};
+        "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc", "arrowstormcalc", "mightycyclonecalc"};
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {
         if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
@@ -1620,7 +1684,7 @@ public static class FPSFixBattleEffectStop
     public static bool Prefix(BattleEffect __instance, ref int ____frame_counter)
     {
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW || phase == BattleEffect.DISP_PHASE.WAIT
+        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW
                  || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN || phase == BattleEffect.DISP_PHASE.SERVANT_UP;
         if (Application.targetFrameRate > 30)
         {
