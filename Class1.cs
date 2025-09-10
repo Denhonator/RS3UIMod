@@ -359,11 +359,22 @@ public static class FPSFixTest
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_endingStatus")]
+public static class EndingStatWindowWidth
+{
+    public static void Prefix(ref ScriptDrive __instance)
+    {
+        __instance.messageWindow[__instance.currentWinIndex].maxDotWidth = 600;
+        RemoveExtraWhitespace.active = true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "PutMessage", new Type[] { typeof(int),typeof(int),typeof(string) })]
 public static class RemoveExtraWhitespace
 {
-    public static void Prefix(ref int ___nextWinDotWidth)
+    public static bool active = false;
+    public static void Prefix(ref string message)
     {
-        ___nextWinDotWidth = Mathf.Max(___nextWinDotWidth, 370);
+        message = Regex.Replace(message, " {2,}", "");
     }
 }
 
@@ -392,6 +403,7 @@ public static class FPSFixTextFade
             HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_disp_frame").SetValue(120);
             HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_fade_frame").SetValue(60);
             HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_scroll_speed").SetValue(2);
+            RemoveExtraWhitespace.active = false;
         }
     }
 }
@@ -1775,7 +1787,8 @@ public static class DisplayParamChange
             string[] split = ParamUpMsg.msg[i].Split(':');
             foreach(int target in ba._you)
             {
-                if (target < 0 || ba._helth[ba._you.IndexOf(target)] == 2)
+                int index = ba._you.IndexOf(target);
+                if (target < 0 || ba._helth[index] == 2 || !ba._is_hit[index] || ba._miss[index] || ba._avoid[index] != AvoidType.NONE)
                     continue;
 
                 if (ba._me.Count < 1)
@@ -2982,6 +2995,8 @@ public static class PageNameSizeSarah
 {
     public static void Prefix(SarahCommander __instance)
     {
+        if (!BattleWork.sarah_commander_flag)
+            return;
         CommanderPageNameWin cmdPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("cmdPageNameWindow").GetValue<CommanderPageNameWin>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(cmdPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
