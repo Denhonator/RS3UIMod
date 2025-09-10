@@ -359,11 +359,11 @@ public static class FPSFixTest
 }
 
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_endingStatus")]
-public static class FinalStatsFix
+public static class RemoveExtraWhitespace
 {
-    public static void Prefix(ref int opt)
+    public static void Prefix(ref int ___nextWinDotWidth)
     {
-        opt = 1;
+        ___nextWinDotWidth = Mathf.Max(___nextWinDotWidth, 370);
     }
 }
 
@@ -1465,6 +1465,12 @@ public static class FPSFixFrameTimings
     }
     public static void Prefix(ref int frame)
     {
+        if (BattleWork.last_battle_flag)
+        {
+            List<Monster> m_monsters = HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("m_monsters").GetValue<List<Monster>>();
+            if (m_monsters.Count > 0 && frame == m_monsters[0].GetEndFrame() - m_monsters[0].GetCurFrame() + 1)
+                return;
+        }
         frame = frame*2+(frame==8 ? FPSFixDodgeGlimmer.offset : 0);
     }
 }
