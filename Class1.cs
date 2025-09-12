@@ -843,6 +843,8 @@ public static class FPSFixInterpolateSS
     static void Postfix(SSObject.Anime __instance)
     {
         bool interpolateThis = interpolate && !Excluded(__instance.m_ssobj.m_fname);
+        float threshold = __instance.m_ssobj.m_fname.Contains("souryuha") ? 50f 
+                        : __instance.m_ssobj.m_fname.Contains("monster") ? 5f : 10f;
         if (interpolateThis && !doubled.ContainsKey(__instance.m_ssobj.m_fname))
         {
             Vector3[] newVertcises = new Vector3[__instance.m_ssobj.m_vtx_array.Length * 2];
@@ -880,63 +882,60 @@ public static class FPSFixInterpolateSS
                     newFrames[i * 2 + j].m_meshes[k].m_npoly = __instance.m_frames[i].m_meshes[k].m_npoly;
                     newFrames[i * 2 + j].m_meshes[k].m_vtx = new int[__instance.m_frames[i].m_meshes[k].m_vtx.Length];
                     int nextMesh = -1;
-                    if(j == 1 && interpolateThis)
+                    if (j == 1 && interpolateThis)
                     {
-                        float minDist = 9999999f;
-                        int minIndex = -1;
-                        for(int k2 = 0; k2 < __instance.m_frames[i2].m_meshes.Length; k2++)
+                        Dictionary<int, int> polyMap = new Dictionary<int, int>();
+                        Dictionary<int, int> rpolyMap = new Dictionary<int, int>();
+                        for (int k2 = 0; k2 < __instance.m_frames[i2].m_meshes.Length && nextMesh < 0; k2++)
                         {
-                            if (__instance.m_frames[i].m_meshes[k].m_vtx.Length != __instance.m_frames[i2].m_meshes[k2].m_vtx.Length
-                                || __instance.m_frames[i].m_meshes[k].m_npoly != __instance.m_frames[i2].m_meshes[k2].m_npoly
-                                || __instance.m_ssobj.m_uv_array[__instance.m_frames[i].m_meshes[k].m_vtx[0]] != __instance.m_ssobj.m_uv_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[0]])
+                            if (__instance.m_frames[i].m_meshes[k].m_mtl_id != __instance.m_frames[i2].m_meshes[k2].m_mtl_id)
                                 continue;
-                            float dist = 0f;
-                            for(int v=0;v< __instance.m_frames[i].m_meshes[k].m_vtx.Length;v++)
-                                dist = Mathf.Max(Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v]]), dist);
-                            //dist /= __instance.m_frames[i].m_meshes[k].m_vtx.Length;
-                            if (dist > 0 && dist < minDist)
+                            polyMap.Clear();
+                            rpolyMap.Clear();
+                            for (int v = 0; v < __instance.m_frames[i].m_meshes[k].m_vtx.Length; v+=4)
                             {
-                                minIndex = k2;
-                                minDist = dist;
+                                float mindist = 9999999f;
+                                for (int v2 = 0; v2 < __instance.m_frames[i2].m_meshes[k2].m_vtx.Length; v2+=4)
+                                {
+                                    float dist = Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v2]]);
+                                    if (dist < mindist && dist < threshold
+                                        && !rpolyMap.ContainsKey(v2) && __instance.m_ssobj.m_uv_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]] == __instance.m_ssobj.m_uv_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v2]])
+                                    {
+                                        polyMap[v] = v2;
+                                        mindist = dist;
+                                    }
+                                }
+                                if(mindist < threshold)
+                                {
+                                    nextMesh = k2;
+                                    rpolyMap[polyMap[v]] = v;
+                                }
                             }
-                            else if (dist <= 0f)
+                            if (polyMap.Keys.Count == 0 || polyMap.Keys.Count < __instance.m_frames[i].m_meshes[k].m_vtx.Length / 8)
+                                nextMesh = -1;
+                        }
+                        for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
+                        {
+                            if (nextMesh >= 0 && newi < __instance.m_ssobj.m_nvtx && polyMap.ContainsKey(v / 4 * 4))
                             {
-                                minIndex = -1;
-                                break;
+                                int newIndex = newi;
+                                int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
+                                int nextIndex = __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[polyMap[v / 4 * 4] + v % 4];
+                                Vector3 interpolated = Vector3.Lerp(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[nextIndex], 0.5f);
+
+                                newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
+                                __instance.m_ssobj.m_vtx_array[newIndex] = interpolated;
+                                __instance.m_ssobj.m_uv_array[newIndex] = __instance.m_ssobj.m_uv_array[oldIndex];
+                                if (__instance.m_ssobj.m_color_array != null)
+                                    __instance.m_ssobj.m_color_array[newIndex] = __instance.m_ssobj.m_color_array[oldIndex];
+                                newi++;
                             }
+                            else
+                                newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
                         }
-                        if (minDist < (__instance.m_ssobj.m_fname.Contains("effect") ? 50f : 20f))
-                        {
-                            nextMesh = minIndex;
-                        }
-                        //else if (minDist < 300f && minIndex >= 0)
-                        //{
-                        //    printBuffer += __instance.m_frames[i2].m_meshes[minIndex].m_npoly + " Frame " + i + " to " + i2 + ": ";
-                        //    foreach(int v in __instance.m_frames[i2].m_meshes[minIndex].m_vtx)
-                        //        printBuffer += __instance.m_ssobj.m_vtx_array[v] + ", ";
-                        //    printBuffer += "\n";
-                        //}
                     }
-
-                    for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
-                    {
-                        if (interpolateThis && j == 1 && nextMesh >= 0 && newi < __instance.m_ssobj.m_nvtx)
-                        {
-                            int newIndex = newi;
-                            int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
-                            int nextIndex = __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[v];
-                            Vector3 interpolated = Vector3.Lerp(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[nextIndex], 0.5f);
-
-                            newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
-                            __instance.m_ssobj.m_vtx_array[newIndex] = interpolated;
-                            __instance.m_ssobj.m_uv_array[newIndex] = __instance.m_ssobj.m_uv_array[oldIndex];
-                            if (__instance.m_ssobj.m_color_array != null)
-                                __instance.m_ssobj.m_color_array[newIndex] = __instance.m_ssobj.m_color_array[oldIndex];
-                            newi++;
-                        }
-                        else
-                            newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
-                    }
+                    else
+                        __instance.m_frames[i].m_meshes[k].m_vtx.CopyTo(newFrames[i * 2 + j].m_meshes[k].m_vtx, 0);
                 }
             }
             if (printBuffer.Length > 0)
@@ -1159,7 +1158,7 @@ public static class FPSFixExecCmd
             }
             cmds_arg = string.Join("_", split);
         }
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds.Contains("contieff") || cmds=="waitframe" || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="camshake" || cmds=="mulava" || cmds== "avaelbun") 
+        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds.Contains("contieff") || cmds=="waitframe" || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="camshake" || cmds=="mulava" || cmds=="ava" || cmds== "avaelbun") 
             && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
