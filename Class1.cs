@@ -832,6 +832,7 @@ public static class FPSFixInterpolateSS2
 public static class FPSFixInterpolateSS
 {
     public static bool interpolate = true;
+    static int newi = 0;
     public static Dictionary<string, bool> doubled = new Dictionary<string, bool>();
 
     public static bool Excluded(string s)
@@ -846,7 +847,7 @@ public static class FPSFixInterpolateSS
         {
             Vector3[] newVertcises = new Vector3[__instance.m_ssobj.m_vtx_array.Length * 2];
             __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, 0);
-            __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, newVertcises.Length/2);
+            //__instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, newVertcises.Length/2);
             __instance.m_ssobj.m_vtx_array = newVertcises;
 
             Vector2[] newUV = new Vector2[__instance.m_ssobj.m_uv_array.Length * 2];
@@ -862,6 +863,7 @@ public static class FPSFixInterpolateSS
 
             __instance.m_ssobj.m_nvtx = newVertcises.Length;
             doubled[__instance.m_ssobj.m_fname] = true;
+            newi = newVertcises.Length / 2;
         }
 
         SSObject.Frame[] newFrames = new SSObject.Frame[__instance.m_frames.Length * 2];
@@ -885,13 +887,14 @@ public static class FPSFixInterpolateSS
                         for(int k2 = 0; k2 < __instance.m_frames[i2].m_meshes.Length; k2++)
                         {
                             if (__instance.m_frames[i].m_meshes[k].m_vtx.Length != __instance.m_frames[i2].m_meshes[k2].m_vtx.Length
-                                || __instance.m_frames[i].m_meshes[k].m_npoly != __instance.m_frames[i2].m_meshes[k2].m_npoly)
+                                || __instance.m_frames[i].m_meshes[k].m_npoly != __instance.m_frames[i2].m_meshes[k2].m_npoly
+                                || __instance.m_ssobj.m_uv_array[__instance.m_frames[i].m_meshes[k].m_vtx[0]] != __instance.m_ssobj.m_uv_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[0]])
                                 continue;
                             float dist = 0f;
                             for(int v=0;v< __instance.m_frames[i].m_meshes[k].m_vtx.Length;v++)
                                 dist = Mathf.Max(Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v]]), dist);
                             //dist /= __instance.m_frames[i].m_meshes[k].m_vtx.Length;
-                            if (dist > 0 && dist < minDist && __instance.m_ssobj.m_uv_array[__instance.m_frames[i].m_meshes[k].m_vtx[0]] == __instance.m_ssobj.m_uv_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[0]])
+                            if (dist > 0 && dist < minDist)
                             {
                                 minIndex = k2;
                                 minDist = dist;
@@ -902,7 +905,7 @@ public static class FPSFixInterpolateSS
                                 break;
                             }
                         }
-                        if (minDist < 5f)
+                        if (minDist < (__instance.m_ssobj.m_fname.Contains("effect") ? 50f : 20f))
                         {
                             nextMesh = minIndex;
                         }
@@ -917,25 +920,19 @@ public static class FPSFixInterpolateSS
 
                     for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
                     {
-                        if (interpolateThis && j == 1 && nextMesh >= 0)
+                        if (interpolateThis && j == 1 && nextMesh >= 0 && newi < __instance.m_ssobj.m_nvtx)
                         {
-                            int newIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v] + __instance.m_ssobj.m_nvtx / 2;
+                            int newIndex = newi;
                             int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
                             int nextIndex = __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[v];
+                            Vector3 interpolated = Vector3.Lerp(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[nextIndex], 0.5f);
 
-                            //Sometimes coordinates may be shared...
-                            if(__instance.m_ssobj.m_vtx_array[newIndex] != __instance.m_ssobj.m_vtx_array[oldIndex])
-                            {
-                                newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
-                                continue;
-                            }
                             newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
-                            //float distance = Vector3.Distance(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[newIndex]);
-                            //printBuffer += (nextIndex - oldIndex) +",";
-                            __instance.m_ssobj.m_vtx_array[newIndex] = Vector3.Lerp(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[nextIndex], 0.5f);
+                            __instance.m_ssobj.m_vtx_array[newIndex] = interpolated;
                             __instance.m_ssobj.m_uv_array[newIndex] = __instance.m_ssobj.m_uv_array[oldIndex];
                             if (__instance.m_ssobj.m_color_array != null)
                                 __instance.m_ssobj.m_color_array[newIndex] = __instance.m_ssobj.m_color_array[oldIndex];
+                            newi++;
                         }
                         else
                             newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = __instance.m_frames[i].m_meshes[k].m_vtx[v];
@@ -947,7 +944,7 @@ public static class FPSFixInterpolateSS
             printBuffer = "";
         }
         __instance.m_frames = newFrames;
-        __instance.m_end_frame = newFrames.Length;
+        __instance.m_end_frame = newFrames.Length + (__instance.m_ssobj.m_fname.Contains("/m31") ? -2 : 0);
     }
 }
 
@@ -1221,7 +1218,7 @@ public static class FPSFixSpecialEff
 {
     public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, ref float ____dt, ref Action ____update_ptn)
     {
-        if(____dt == 0f && Application.targetFrameRate > 30 && ____update_ptn.Method.Name != "update_none")
+        if(____dt == 0f && Application.targetFrameRate > 30 && ____update_ptn.Method.Name != "update_none" && ____update_ptn.Method.Name != "test_update")
         {
             ____inv_time *= 0.5f;
             if(RS3UI.prints>0)
