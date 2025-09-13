@@ -754,8 +754,11 @@ public static class FPSFixInterpolateSS3
 
     static void Prefix(SSObject __instance, ref int frame)
     {
+        List<Monster> m_monsters = GameCore.m_state == GameCore.State.BATTLE ? HarmonyLib.Traverse.Create(GameCore.m_battle._effect).Field("m_monsters").GetValue<List<Monster>>() : null;
         if (__instance.m_fname.Contains("rrow"))
-            frame += frame+1;
+            frame += frame + 1;
+        else if (m_monsters != null && m_monsters.Count > 0 && m_monsters[0].GetCurFrame() == frame)
+            return;
         else if (!Excluded(__instance.m_fname))
             frame *= 2;
     }
@@ -1215,7 +1218,7 @@ public static class FPSFixUpdateFade
 [HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update")]
 public static class FPSFixSpecialEff
 {
-    public static bool Prefix(SpecialEffMonster __instance, ref float ____inv_time, ref float ____dt, ref Action ____update_ptn)
+    public static void Prefix(SpecialEffMonster __instance, ref float ____inv_time, ref float ____dt, ref Action ____update_ptn)
     {
         if(____dt == 0f && Application.targetFrameRate > 30 && ____update_ptn.Method.Name != "update_none" && ____update_ptn.Method.Name != "test_update")
         {
@@ -1223,12 +1226,6 @@ public static class FPSFixSpecialEff
             if(RS3UI.prints>0)
                 Msg(____update_ptn.Method.Name);
         }
-        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
-        {
-            ____update_ptn();
-            return false;
-        }
-        return true;
     }
 }
 
@@ -1261,6 +1258,18 @@ public static class FPSFixAunas
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "update_muma_1")]
+public static class FPSFixMuma
+{
+    public static void Prefix(ref Vector4 ____raster_param_y, Vector4 ____add_raster_y,
+                              ref Vector4 ____raster_param_x, Vector4 ____add_raster_x)
+    {
+        if (Application.targetFrameRate > 30)
+            ____raster_param_y -= ____add_raster_y * 0.5f;
+            ____raster_param_x -= ____add_raster_x * 0.5f;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(SpecialEffMonster), "call_aunasu_appear")]
 public static class FPSFixAunas2
 {
@@ -1280,9 +1289,20 @@ public static class FPSFixAunas2
 public static class FPSFixFinalBossAppear
 {
     public static int slowdown = 0;
+    public static int skip = 0;
     static void Prefix()
     {
         slowdown = 170;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "julian_block_julian")]
+public static class FPSFixJulianBlock
+{
+    static void Prefix()
+    {
+        FPSFixFinalBossAppear.skip = 16;
+        FPSFixFinalBossAppear.slowdown = 16;
     }
 }
 
@@ -1695,8 +1715,13 @@ public static class FPSFixLastBossParty
     {
         if(Application.targetFrameRate>30 && Time.frameCount % 2 == 0 && FPSFixFinalBossAppear.slowdown > 0)
         {
-            FPSFixFinalBossAppear.slowdown--;
-            ____frame_counter--;
+            if (FPSFixFinalBossAppear.skip > 0)
+                FPSFixFinalBossAppear.skip--;
+            else
+            {
+                FPSFixFinalBossAppear.slowdown--;
+                ____frame_counter--;
+            }
         }
     }
 }
@@ -2041,7 +2066,7 @@ public static class FPSFixWobble
 {
     public static void Prefix(BattleLogic.BattleScene __instance)
     {
-        BattleLogic.BattleScene._raster_parameter_vy = RS3UI.rasterparameter.y * Time.deltaTime * -15f;
+        BattleLogic.BattleScene._raster_parameter_vy = RS3UI.rasterparameter.y * Time.deltaTime * 15f;
         BattleLogic.BattleScene._raster_parameter_vx = RS3UI.rasterparameter.x * Time.deltaTime * 15f;
     }
 }
