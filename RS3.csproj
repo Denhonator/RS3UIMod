@@ -26,6 +26,9 @@
     <Reference Include="UnityEngine.ImageConversionModule">
       <HintPath>F:\SteamLibrary\steamapps\common\RomancingSaGa3\rs3_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>F:\SteamLibrary\steamapps\common\RomancingSaGa3\rs3_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine.InputModule">
       <HintPath>F:\SteamLibrary\steamapps\common\RomancingSaGa3\rs3_Data\Managed\UnityEngine.InputModule.dll</HintPath>
     </Reference>
