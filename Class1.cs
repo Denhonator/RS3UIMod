@@ -53,6 +53,7 @@ public class Settings
 
     public bool interpolate = true;
     public bool displayParam = true;
+    //public bool disableAnim = false;
 }
 
 [HarmonyLib.HarmonyPatch(typeof(GameCore), "Update")]
@@ -468,21 +469,6 @@ public static class FPSFixStay2
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(BattleEffect.SSObject), "Update")]
-//public static class FPSFixSSObject
-//{
-//    public static bool Prefix(BattleEffect.SSObject __instance, SSObject ___m_obj)
-//    {
-//        if (___m_obj != null && ___m_obj.m_anime != null)
-//        {
-//            SSObject.Anime anime = ___m_obj.m_anime[___m_obj.m_cur_anim_idx];
-//            if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && (anime.m_cur_frame >= 0 || anime.m_end_frame <= 0))
-//                return false;
-//        }
-//        return true;
-//    }
-//}
-
 [HarmonyLib.HarmonyPatch(typeof(ArrowStorm.Bow), "GetCurAnimFrame")]
 public static class FPSFixAnimFrame
 {
@@ -585,28 +571,12 @@ public static class FPSFixArrows
 }
 
 //[HarmonyLib.HarmonyPatch(typeof(Monster), "Update")]
-//public static class FPSFixSSObject2
+//public static class DisableBossAnim
 //{
-//    public static bool Prefix(Monster __instance)
+//    public static void Postfix(Monster __instance)
 //    {
-//        if (Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-//            return false;
-//        return true;
-//    }
-//}
-
-//[HarmonyLib.HarmonyPatch(typeof(SSObject), "Update")]
-//public static class FPSFixSSObjectSSMovie
-//{
-//    public static void Prefix(SSObject __instance)
-//    {
-//        if (__instance.GetType() == typeof(EventUtil.ScriptSSObject) &&
-//            Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
-//        {
-//            SSObject.Anime anime = __instance.m_anime[__instance.m_cur_anim_idx];
-//            if (anime.m_cur_frame > 0 && anime.m_end_frame - anime.m_cur_frame > 10)
-//                anime.m_cur_frame--;
-//        }
+//        if (Settings.instance.disableAnim && __instance.m_anime != null && __instance.m_anime[__instance.m_cur_anim_idx].m_loop)
+//            __instance.m_anime[__instance.m_cur_anim_idx].m_cur_frame = __instance.m_anime[__instance.m_cur_anim_idx].m_start_frame;
 //    }
 //}
 
@@ -1041,15 +1011,6 @@ public static class FPSFixResonance
 //        BattleWork.hirameki_count = -10000;
 //    }
 //}
-
-[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_matomonapanti_calc")]
-public static class FPSFixMatomonapanti
-{
-    public static bool Prefix()
-    {
-        return !(Application.targetFrameRate > 30 && Time.frameCount % 2 == 0);
-    }
-}
 
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
@@ -2274,6 +2235,7 @@ public static class FPSFixHalfSpeedFunc
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "StatusUP");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "cmd_pcmodoru");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "cmd_trish_pcmodoru");
+        yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "cmd_matomonapanti_calc");
         yield return HarmonyLib.AccessTools.Method(typeof(ScriptDrive), "UpdateShake");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleLogic.BattleScene), "act_battle_anim");
     }
@@ -2293,6 +2255,15 @@ public static class FPSFixBattleMess
     {
         if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
             ____wait_counter--;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MessageWindow), "ResettingMessSpeed")]
+public static class MessageSpeed
+{
+    public static void Postfix(MessageWindow __instance)
+    {
+        __instance.message_speed = Application.targetFrameRate > 30 ? 1 : 2;
     }
 }
 
@@ -2523,34 +2494,16 @@ public static class TextFlashingResetWindow
     }
 }
 
-[HarmonyLib.HarmonyPatch(typeof(SarahCommander), "StrFlashingUpdate")]
-public static class TextFlashingSarah
+[HarmonyLib.HarmonyPatch]
+public static class TextFlashing
 {
-    public static void Prefix(SarahCommander __instance, ref float ___strColorAdd, ref float ___strColor)
+    public static IEnumerable<System.Reflection.MethodBase> TargetMethods()
     {
-        RS3UI.windowType = "CommandSelect";
-        if (___strColor <= 0.3f)
-            ___strColorAdd = 1f;
-        ___strColorAdd = Mathf.Sign(___strColorAdd) * Time.deltaTime * 2.5f;
+        yield return HarmonyLib.AccessTools.Method(typeof(SarahCommander), "StrFlashingUpdate");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "StrFlashingUpdate");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "StrFlashingUpdate");
     }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommandMode), "StrFlashingUpdate")]
-public static class TextFlashingCommand
-{
-    public static void Prefix(CommandMode __instance, ref float ___strColorAdd, ref float ___strColor)
-    {
-        RS3UI.windowType = "CommandSelect";
-        if (___strColor <= 0.3f)
-            ___strColorAdd = 1f;
-        ___strColorAdd = Mathf.Sign(___strColorAdd) * Time.deltaTime * 2.5f;
-    }
-}
-
-[HarmonyLib.HarmonyPatch(typeof(CommanderMode), "StrFlashingUpdate")]
-public static class TextFlashingCommander
-{
-    public static void Prefix(CommanderMode __instance, ref float ___strColorAdd, ref float ___strColor)
+    public static void Prefix(ref float ___strColorAdd, ref float ___strColor)
     {
         RS3UI.windowType = "CommandSelect";
         if (___strColor <= 0.3f)
@@ -2602,7 +2555,6 @@ public static class WhiteTextTrade
         ___m_font2.SetColor(byte.MaxValue, byte.MaxValue, byte.MaxValue);
         ___m_font1.SetFontEffect(GS.FontEffect.RIM);
         ___m_font2.SetFontEffect(GS.FontEffect.RIM);
-
     }
 }
 
@@ -2822,9 +2774,12 @@ public static class PopupMessages
     public static void Prefix(ref int WordCountX, ref int WordCountY, ref string mess)
     {
         string[] lines = mess.Split('\n');
-        WordCountX = lines[0].Length / 2;
-        if(lines.Length>1 && lines[1].Length / 2 > WordCountX)
-            WordCountX = lines[1].Length / 2;
+        WordCountX = GameCore.m_userProfile.language == 0 ? lines[0].Length : 3 * lines[0].Length / 5;
+        if (lines.Length > 1)
+        {
+            int line2len = GameCore.m_userProfile.language == 0 ? lines[1].Length : 3 * lines[1].Length / 5;
+            WordCountX = Mathf.Max(WordCountX, line2len);
+        }
     }
 }
 
@@ -2862,22 +2817,24 @@ public static class DisableTextScrollCommand
         cVariableWindow.SetPos(105, 463);
         cVariableWindow.SetSize(750, 64);
         GS.FillRectZ(110, 462, 4000, 746, 55, 0.5f);
+        char d1 = GameCore.m_userProfile.language == 0 ? '。' : '.';
+        char d2 = GameCore.m_userProfile.language == 0 ? '、' : ' ';
 
         if (descText.Length > RS3UI.descLineLen)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < RS3UI.descLineLen)
+                if (descText.IndexOf(d1) < descText.Length - 5 && descText.IndexOf(d1) > 0 && descText.IndexOf(d1) < RS3UI.descLineLen)
                 {
-                    line2 = descText.Substring(descText.IndexOf('.') + 2);
-                    descText = descText.Substring(0, descText.IndexOf('.') + 1);
+                    line2 = descText.Substring(descText.IndexOf(d1) + 1 + GameCore.m_userProfile.language);
+                    descText = descText.Substring(0, descText.IndexOf(d1) + 1);
                 }
                 else
                 {
-                    line2 = descText.Substring(descText.LastIndexOf(' ', RS3UI.descLineLen) + 1);
-                    descText = descText.Substring(0, descText.LastIndexOf(' ', RS3UI.descLineLen));
+                    line2 = descText.Substring(descText.LastIndexOf(d2, RS3UI.descLineLen) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(d2, RS3UI.descLineLen) + 1);
                 }
-                HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
+                //HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
                 if (line2 != "")
                 {
                     GS.DrawString(line2, 125, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
@@ -2909,22 +2866,24 @@ public static class DisableTextScrollCommander
         cVariableWindow.SetPos(105, 463);
         cVariableWindow.SetSize(750, 64);
         GS.FillRectZ(110, 462, 4000, 746, 55, 0.5f);
+        char d1 = GameCore.m_userProfile.language == 0 ? '。' : '.';
+        char d2 = GameCore.m_userProfile.language == 0 ? '、' : ' ';
 
         if (descText.Length > RS3UI.descLineLen)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < RS3UI.descLineLen)
+                if (descText.IndexOf(d1) < descText.Length - 5 && descText.IndexOf(d1) > 0 && descText.IndexOf(d1) < RS3UI.descLineLen)
                 {
-                    line2 = descText.Substring(descText.IndexOf('.') + 2);
-                    descText = descText.Substring(0, descText.IndexOf('.') + 1);
+                    line2 = descText.Substring(descText.IndexOf(d1) + 1 + GameCore.m_userProfile.language);
+                    descText = descText.Substring(0, descText.IndexOf(d1) + 1);
                 }
                 else
                 {
-                    line2 = descText.Substring(descText.LastIndexOf(' ', RS3UI.descLineLen) + 1);
-                    descText = descText.Substring(0, descText.LastIndexOf(' ', RS3UI.descLineLen));
+                    line2 = descText.Substring(descText.LastIndexOf(d2, RS3UI.descLineLen) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(d2, RS3UI.descLineLen) + 1);
                 }
-                HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
+                //HarmonyLib.Traverse.Create(__instance).Field("descText").SetValue(descText);
                 if (line2 != "")
                 {
                     GS.DrawString(line2, 125, 495, 0, Color.white, GS.FontEffect.SHADOW_WINDOW);
@@ -2960,20 +2919,22 @@ public static class DisableTextScrollMenu
         cVariableWindow.SetSize(750, 64);
         cVariableWindow.Draw(false);
         GS.FillRectZ(110, 462, 4000, 746, 55, 0.5f);
+        char d1 = GameCore.m_userProfile.language == 0 ? '。' : '.';
+        char d2 = GameCore.m_userProfile.language == 0 ? '、' : ' ';
 
         if (descText.Length > RS3UI.descLineLen)
         {
             try
             {
-                if (descText.IndexOf('.') < descText.Length - 5 && descText.IndexOf('.') < RS3UI.descLineLen)
+                if (descText.IndexOf(d1) < descText.Length - 5 && descText.IndexOf(d1) > 0 && descText.IndexOf(d1) < RS3UI.descLineLen)
                 {
-                    line2 = descText.Substring(descText.IndexOf('.') + 2);
-                    descText = descText.Substring(0, descText.IndexOf('.') + 1);
+                    line2 = descText.Substring(descText.IndexOf(d1) + 1 + GameCore.m_userProfile.language);
+                    descText = descText.Substring(0, descText.IndexOf(d1) + 1);
                 }
                 else
                 {
-                    line2 = descText.Substring(descText.LastIndexOf(' ', RS3UI.descLineLen) + 1);
-                    descText = descText.Substring(0, descText.LastIndexOf(' ', RS3UI.descLineLen));
+                    line2 = descText.Substring(descText.LastIndexOf(d2, RS3UI.descLineLen) + 1);
+                    descText = descText.Substring(0, descText.LastIndexOf(d2, RS3UI.descLineLen) + 1);
                 }
                 if (line2 != "")
                 {
@@ -3016,10 +2977,10 @@ public static class TextPosition
                 else if (_y == (GameCore.m_userProfile.language == 1 ? 128 : 123) + i * 40)
                     _y = RS3UI.commandY + 2 + i * 26;
             }
-            if (str.Length >= 18)
+            if (str.Length >= 18 || (GameCore.m_userProfile.language == 0 && str.Length >= 8))
             {
-                scale = 0.8f;
-                _y += 1;
+                scale = GameCore.m_userProfile.language == 0 ? 0.7f : 0.8f;
+                _y += GameCore.m_userProfile.language == 0 ? 2 : 1;
             }
         }
         else if (RS3UI.windowType == "PageName")
@@ -3318,17 +3279,16 @@ public static class TextOutline
 {
     public static void Prefix(ref Color32 color, ref GS.FontEffect effect)
     {
-        //GS.FontSize = 60f;
-        //GS.m_font_scale_x = 2f;
-        //GS.m_font_scale_y = 2f;
+        if (GameCore.m_userProfile.language == 0)
+        {
+            GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
+            GS.FontSize = 24f;
+        }
+
         if (RS3UI.windowType == "CommandSelect")
             return;
         if ((effect & GS.FontEffect.RIM) == GS.FontEffect.RIM && color.r==0 && color.b==0)
             effect += GS.FontEffect.SHADOW - GS.FontEffect.RIM;
-        if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0)
-        {
-            effect = GS.FontEffect.RIM_WINDOW;
-        }
     }
 }
 
@@ -3373,13 +3333,12 @@ public static class FontChange
         GS.m_font_mtl[(int)type] = ShaderUtil.CreateMaterial(ShaderUtil.Type.FONT);
         GS.m_font_mtl[(int)type].mainTexture = GS.m_font[(int)type].material.mainTexture;
         GS.m_font_mtl[(int)type].color = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
-        //GS.m_font_mtl[(int)type].mainTexture.filterMode = FilterMode.Point;
         GS.m_font_mtl[(int)type].renderQueue = 6001;
         ShaderUtil.SetDepthTest(GS.m_font_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
         GS.m_shadow_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
         ShaderUtil.SetDepthTest(GS.m_shadow_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
         GS.m_shadow_mtl[(int)type].renderQueue = 6000;
-        GS.m_shadow_mtl[(int)type].color = new Color32(0, 0, 0, 128);
+        GS.m_shadow_mtl[(int)type].color = new Color32(0, 0, 0, byte.MaxValue);
         GS.m_rim_mtl[(int)type] = new Material(GS.m_font_mtl[(int)type]);
         GS.m_rim_mtl[(int)type].color = new Color32(0, 0, 0, byte.MaxValue);
         ShaderUtil.SetDepthTest(GS.m_rim_mtl[(int)type], UnityEngine.Rendering.CompareFunction.Always);
@@ -3570,7 +3529,7 @@ public static class ParamDownMsg2
         if (param.Length >= 21)
             param = "ALL";
 
-        Msg("param_down: ");
+        //Msg("param_down: ");
         for (int i = 0; i < param.Length; i += 3)
         {
             string toadd = ____ref_acter._unit_id + ":" + ____ref_target._unit_id + ":-" + param.Substring(i, 3);
@@ -3588,6 +3547,7 @@ public static class GUIButtons
         //GUI.Label(new Rect(8, 70, 96f, 32f), "");
         Settings.instance.interpolate = GUI.Toggle(new Rect(8, 88, 200f, 32f), Settings.instance.interpolate, "Interpolation");
         Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 200f, 32f), Settings.instance.displayParam, "Display buff/debuff");
+        //Settings.instance.disableAnim = GUI.Toggle(new Rect(8, 152, 200f, 32f), Settings.instance.disableAnim, "Disable boss anim");
     }
 }
 
@@ -3637,6 +3597,8 @@ namespace RS3
 
         public override void OnUpdate()
         {
+            if (GameCore.m_userProfile != null)
+                descLineLen = GameCore.m_userProfile.language == 0 ? 40 : 85;
             if (Input.GetKeyDown(KeyCode.F1))
             {
                 prints = (prints + 1) % 3;
