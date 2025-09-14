@@ -2975,7 +2975,7 @@ public static class TextPosition
                 if (_y == (GameCore.m_userProfile.language == 1 ? 126 : 120) + i * 40)
                     _y = RS3UI.commandY + i * 26;
                 else if (_y == (GameCore.m_userProfile.language == 1 ? 128 : 123) + i * 40)
-                    _y = RS3UI.commandY + 2 + i * 26;
+                    _y = RS3UI.commandY + i * 26;
             }
             if (str.Length >= 18 || (GameCore.m_userProfile.language == 0 && str.Length >= 8))
             {
@@ -3289,6 +3289,10 @@ public static class TextOutline
             return;
         if ((effect & GS.FontEffect.RIM) == GS.FontEffect.RIM && color.r==0 && color.b==0)
             effect += GS.FontEffect.SHADOW - GS.FontEffect.RIM;
+        if ((effect & GS.FontEffect.SHADOW) > 0 && color.r <= 0 && color.a > 0)
+        {
+            GS.m_shadow_mtl[0].color = new Color32(0, 0, 0, 127);
+        }
     }
 }
 
