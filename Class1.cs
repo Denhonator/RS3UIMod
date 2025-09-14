@@ -718,8 +718,6 @@ public static class FPSFixInterpolateSS2
 {
     static void Prefix(SSObject __instance, SSObject.SSPreLoad pdata)
     {
-        if (RS3UI.prints > 0)
-            Msg(__instance.m_fname);
         if(pdata == null)
             FPSFixInterpolateSS.doubled.Remove(__instance.m_fname);
     }
@@ -838,8 +836,11 @@ public static class FPSFixInterpolateSS
                 Msg(printBuffer);
             printBuffer = "";
         }
+        if (RS3UI.prints > 0)
+            Msg(__instance.m_name);
         __instance.m_frames = newFrames;
-        __instance.m_end_frame = newFrames.Length + (__instance.m_ssobj.m_fname.Contains("/m31") ? -2 : 0);
+        __instance.m_end_frame = newFrames.Length + 
+            (newFrames.Length > 30 && __instance.m_name.Contains("anime_1") && __instance.m_ssobj.m_fname.Contains("monster") ? -2 : 0);
     }
 }
 
