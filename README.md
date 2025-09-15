@@ -11,6 +11,7 @@ Included features:
 * Options for the above settings can be accessed by pressing Home on the keyboard in-game or from the settings file in AppData\LocalLow\SquareEnix\RomancingSaGa3.
 * Speed toggle. Press R3 or PageDown to toggle between 1x, 2x and 3x speed. This option multiplies FPS. Field, battle and others save speed multiplier separately.
 * Miscellaneous fixes such as a few incorrect tooltips, incorrect boss animation looping and incorrect parameters in a couple cutscenes.
+* You can also add your own texture or text replacements. Textures loaded by the game will show up in the Extract folder, so just copy the directory structure into ReplaceTexture folder and add your edits.
 * Japanese is also supported. 日本語にも対応。
 
 Let me know if there are bugs or timings of animation being off.
