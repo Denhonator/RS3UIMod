@@ -20,4 +20,4 @@ You need something like MelonLoader https://github.com/LavaGang/MelonLoader
 Then put the ReplaceTexture, rs3font and Mods folder from the releases page into the game folder (or compile the mod yourself with VS 2017)
 
 ### How it looks
-<img width="1920" height="1080" alt="RS3Mod" src="https://github.com/user-attachments/assets/2e6ceeb6-7689-400c-807b-02a2f0d71acd" />
+<img width="1920" height="1080" alt="rs3mod" src="https://github.com/user-attachments/assets/320d94d4-6b0c-4758-96ef-e4a2e253b64d" />
