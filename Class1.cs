@@ -3324,7 +3324,7 @@ public static class FontChange
             Util.Destroy(GS.m_d_font_mtl[(int)type]);
             Util.Destroy(GS.m_d_shadow_mtl[(int)type]);
         }
-        if (File.Exists("rs3font.ttf"))
+        if (File.Exists("rs3font"))
         {
             AssetBundle ab = AssetBundle.LoadFromFile("rs3font");
             foreach (string s in ab.GetAllAssetNames())
