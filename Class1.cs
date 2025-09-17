@@ -782,7 +782,7 @@ public static class FPSFixInterpolateSS
                         Dictionary<int, int> rpolyMap = new Dictionary<int, int>();
                         for (int k2 = 0; k2 < __instance.m_frames[i2].m_meshes.Length && nextMesh < 0; k2++)
                         {
-                            if (__instance.m_frames[i].m_meshes[k].m_mtl_id != __instance.m_frames[i2].m_meshes[k2].m_mtl_id)
+                            if (__instance.m_ssobj.m_mtl[__instance.m_frames[i].m_meshes[k].m_mtl_id].mainTexture.name != __instance.m_ssobj.m_mtl[__instance.m_frames[i2].m_meshes[k2].m_mtl_id].mainTexture.name)
                                 continue;
                             polyMap.Clear();
                             rpolyMap.Clear();
@@ -792,11 +792,21 @@ public static class FPSFixInterpolateSS
                                 for (int v2 = 0; v2 < __instance.m_frames[i2].m_meshes[k2].m_vtx.Length; v2+=4)
                                 {
                                     float dist = Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v2]]);
-                                    if (dist < mindist && dist < threshold
+                                    if (dist < mindist && dist < threshold && dist > 0.1f
                                         && !rpolyMap.ContainsKey(v2) && __instance.m_ssobj.m_uv_array[__instance.m_frames[i].m_meshes[k].m_vtx[v]] == __instance.m_ssobj.m_uv_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v2]])
                                     {
-                                        polyMap[v] = v2;
-                                        mindist = dist;
+                                        bool allok = true;
+                                        for (int o = 1; o <= 3; o++)
+                                        {
+                                            float dist2 = Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[v+o]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k2].m_vtx[v2+o]]);
+                                            if (dist2 >= threshold)
+                                                allok = false;
+                                        }
+                                        if (allok)
+                                        {
+                                            polyMap[v] = v2;
+                                            mindist = dist;
+                                        }
                                     }
                                 }
                                 if(mindist < threshold)
