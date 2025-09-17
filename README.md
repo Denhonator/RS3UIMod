@@ -22,3 +22,6 @@ Then get the RS3UIMod.zip from the releases page on the right, and extract the R
 
 ### How it looks
 <img width="1920" height="1080" alt="rs3mod" src="https://github.com/user-attachments/assets/320d94d4-6b0c-4758-96ef-e4a2e253b64d" />
+
+### Contributions
+Special thanks to [grenadier42 on Reddit](https://www.reddit.com/r/SaGa/comments/pjxwoz/turbo_mod_for_romancing_saga_3_on_pc/) for creating the turbo mod and sharing the source code, which helped me get started with modding the game myself. The included speed-up functionality is still mostly the same code.
