@@ -117,16 +117,14 @@ public static class TrackGameStateChanges
     {
         GameCore.State currState = GameCore.m_state;
 
-        if (prevState != currState && !IgnoreNextStateChange)
+        if (prevState != currState)
         {
-            //System.IO.File.AppendAllText("test.txt", $"Detected state change {{{oldState} => {newState}}}\n");
             SetGameSpeedByState(currState);
-            //if (Screen.currentResolution.refreshRate % 60 == 0 && Screen.currentResolution.refreshRate <= 240) {
-            //    QualitySettings.vSyncCount = Screen.currentResolution.refreshRate / Application.targetFrameRate;
-            //}
+            if (currState == GameCore.State.OPENNING)
+                GS.FontSize = 36f;
+            else if (prevState == GameCore.State.OPENNING)
+                GS.FontSize = 24f;
         }
-
-        IgnoreNextStateChange = false;
     }
 }
 
@@ -3347,7 +3345,7 @@ public static class TextOutline
         if (GameCore.m_userProfile.language == 0)
         {
             GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
-            GS.FontSize = 24f;
+            //GS.FontSize = 24f;
         }
 
         if (RS3UI.windowType == "CommandSelect")
@@ -3357,7 +3355,7 @@ public static class TextOutline
         if ((effect & GS.FontEffect.SHADOW) > 0 && color.r <= 0 && color.a > 0)
             GS.m_shadow_mtl[0].color = new Color32(0, 0, 0, 127);
 
-        if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0)
+        if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0 && GameCore.m_state == GameCore.State.OPENNING)
             effect = GS.FontEffect.RIM_WINDOW;
     }
 
@@ -3405,6 +3403,7 @@ public static class FontChange
                 Msg(s);
             GS.m_font[(int)type] = ab.LoadAsset<Font>("rs3font.ttf");
             Msg("Loaded rs3font.ttf");
+            ab.Unload(false);
         }
         else
             GS.m_font[(int)type] = (Font)Resources.Load(name);
