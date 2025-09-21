@@ -2241,7 +2241,8 @@ public static class FPSFixHalfSpeedFunc
         yield return HarmonyLib.AccessTools.Method(typeof(Trade), "DateUpdate");
         yield return HarmonyLib.AccessTools.Method(typeof(Trade), "FuncBehavior");
         yield return HarmonyLib.AccessTools.Method(typeof(MassCombat.MCMain), "mc_update_anim");
-        yield return HarmonyLib.AccessTools.Method(typeof(MassCombat.MCMain), "mc_update");
+        //yield return HarmonyLib.AccessTools.Method(typeof(MassCombat.MCMain), "font_1_type");
+        yield return HarmonyLib.AccessTools.Method(typeof(MassCombat.MCMain), "UpdateEffect");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "SpinCharacter");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "StatusUP");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffect), "cmd_pcmodoru");
@@ -2255,6 +2256,31 @@ public static class FPSFixHalfSpeedFunc
     {
         if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
             return false;
+        return true;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "mc_update")]
+public static class FPSFixMassCombatInput
+{
+    public static bool Prefix(MassCombat.MCMain __instance, ref int ___sadr, ref int ___input_key, byte[] ___mc_sinario_data, ref int ___state_mc_update, ref int ___battle_sts)
+    {
+        if (Application.targetFrameRate > 30 && Time.frameCount % 2 == 0)
+        {
+            if ((___mc_sinario_data[___sadr + 23] & 1) != 0 && ___input_key != 0)
+                ___state_mc_update = 0x1D;
+            if ((___battle_sts & 128) == 0)
+            {
+                if (GameCore.m_partyWork._flag_tbl[114] == 0) {
+                    System.Reflection.MethodInfo dynMethod = __instance.GetType().GetMethod("key_mc_battle",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    dynMethod.Invoke(__instance, new object[] { });
+                }
+                if ((___battle_sts & 16) != 0)
+                    ___state_mc_update = 0x1B;
+            }
+            return false;
+        }
         return true;
     }
 }
@@ -3027,6 +3053,30 @@ public static class TextPosition2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "font_scroll")]
+public static class FixMassCombatScroll
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && Mathf.Abs((sbyte)code.operand) >= 20)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)code.operand * 3 / 4);
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "wind_close")]
+public static class FixMassCombatWindowSize
+{
+    public static void Postfix()
+    {
+        MassCombatWindow.extraWidth = 0;
+    }
+}
+
 namespace MassCombat
 {
     public class MC_wind_work
@@ -3060,18 +3110,21 @@ namespace MassCombat
 [HarmonyLib.HarmonyPatch(typeof(MassCombat.MCMain), "draw_wind")]
 public static class MassCombatWindow
 {
+    public static int extraWidth = 0;
     public static bool Prefix(MassCombat.MCMain __instance, ref bool ___wind_touch_rect, 
         ref int ___disp_tate, ref int ___font_max_width, string[] ___font_touch, ref bool ___button_visible,
         ref int ___draw_wind_ofs_x, ref int ___draw_wind_ofs_y, MassCombat.MC_wind_work[] ___windwk,
         ref bool ___cursor_visible, ref int ___font_now, ref int ___m_scroll_y, ref Color ___font_hanten,
-        ref int ___font_hanten_flg)
+        ref int ___font_hanten_flg, string ___font_adr, int ___font_start)
     {
+        extraWidth = Mathf.Max(extraWidth, (___font_adr.IndexOf('$', ___font_start) - ___font_start - 26) * 11);
+
         ___button_visible = false;
         ___font_max_width = 0;
-        int _px = ___windwk[0].x + ___draw_wind_ofs_x;
+        int _px = ___windwk[0].x + ___draw_wind_ofs_x - extraWidth / 2;
         int _py = ___windwk[0].y + ___draw_wind_ofs_y;
         ___windwk[0].h = ___disp_tate * 30;
-        int w = ___windwk[0].w;
+        int w = ___windwk[0].w + extraWidth;
         int h = ___windwk[0].h;
         if (___wind_touch_rect)
         {
@@ -3113,7 +3166,8 @@ public static class MassCombatWindow
             {
                 color = ___font_hanten;
             }
-            GS.DrawStringMenu(___windwk[0].str[i], _px+8, ___m_scroll_y + _py + 30 * i, 0, color, GS.FontEffect.RIM, 0, 3, 1f);
+
+            GS.DrawStringMenu(___windwk[0].str[i], _px+8, ___m_scroll_y + _py + 30 * i, 0, color, GS.FontEffect.SHADOW_WINDOW, 0, 3, 1f);
             num8 += ___windwk[0].str[i].Length;
         }
         if (num8 > 0)
