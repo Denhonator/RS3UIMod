@@ -3355,8 +3355,18 @@ public static class TextOutline
         if ((effect & GS.FontEffect.RIM) == GS.FontEffect.RIM && color.r==0 && color.b==0)
             effect += GS.FontEffect.SHADOW - GS.FontEffect.RIM;
         if ((effect & GS.FontEffect.SHADOW) > 0 && color.r <= 0 && color.a > 0)
-        {
             GS.m_shadow_mtl[0].color = new Color32(0, 0, 0, 127);
+
+        if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0)
+            effect = GS.FontEffect.RIM_WINDOW;
+    }
+
+    public static void Postfix(ref Color32 color)
+    {
+        Color32[] m_rim_color = HarmonyLib.Traverse.Create(typeof(GS)).Field("m_rim_color").GetValue<Color32[]>();
+        for(int i = 0; i < m_rim_color.Length; i++)
+        {
+            m_rim_color[i].a = color.a;
         }
     }
 }
