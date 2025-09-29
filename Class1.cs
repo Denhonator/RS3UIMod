@@ -2318,7 +2318,8 @@ public static class RemoveExtraWhitespace
     public static bool active = false;
     public static void Prefix(ref string message)
     {
-        message = Regex.Replace(message, " {2,}", "");
+        if(active)
+            message = Regex.Replace(message, " {2,}", "");
     }
 }
 
