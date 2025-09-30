@@ -122,7 +122,7 @@ public static class TrackGameStateChanges
         {
             SetGameSpeedByState(currState);
             if (currState == GameCore.State.OPENNING)
-                GS.FontSize = 36f;
+                GS.FontSize = 28f;
             else if (prevState == GameCore.State.OPENNING)
                 GS.FontSize = 24f;
         }
@@ -1385,7 +1385,6 @@ public static class FPSFixFrameTimings
         yield return HarmonyLib.AccessTools.Method(typeof(MoveOperate), "set_wait");
         yield return HarmonyLib.AccessTools.Method(typeof(Shake), "setup");
         yield return HarmonyLib.AccessTools.Method(typeof(Flash), "setup");
-        yield return HarmonyLib.AccessTools.Method(typeof(Field), "SetEventScroll");
         yield return HarmonyLib.AccessTools.Method(typeof(BattleEffectLastBossDead), "SetStart");
     }
     public static void Prefix(ref int frame)
@@ -1397,6 +1396,15 @@ public static class FPSFixFrameTimings
                 return;
         }
         frame = frame*2+(frame==8 ? FPSFixDodgeGlimmer.offset : 0);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field), "SetEventScroll")]
+public static class FPSFixFrameTimings2
+{
+    public static void Prefix(int x, int y, ref int frame)
+    {
+        frame = frame * 2 + 1;
     }
 }
 
@@ -1627,11 +1635,10 @@ public static class FPSFixLastBossParty
 public static class FPSFixBattleEffectStop
 {
     static BattleEffect.DISP_PHASE lastPhase = BattleEffect.DISP_PHASE.WAIT;
-    public static bool Prefix(BattleEffect __instance, ref int ____frame_counter)
+    public static bool Prefix(BattleEffect __instance, ref int ____frame_counter, ref int ___frame_cnt)
     {
         BattleEffect.DISP_PHASE phase = HarmonyLib.Traverse.Create(__instance).Field("m_disp_phase").GetValue<BattleEffect.DISP_PHASE>();
-        bool slow = phase == BattleEffect.DISP_PHASE.SKILL_WINDOW
-                 || phase == BattleEffect.DISP_PHASE.SERVANT_DOWN || phase == BattleEffect.DISP_PHASE.SERVANT_UP;
+        bool slow = phase == BattleEffect.DISP_PHASE.SERVANT_DOWN || phase == BattleEffect.DISP_PHASE.SERVANT_UP;
         if (Application.targetFrameRate > 30)
         {
             //__instance._excel_driver_offs = Vector2.right * 960f / 5f;
@@ -1650,13 +1657,13 @@ public static class FPSFixBattleEffectStop
         else if(phase == BattleEffect.DISP_PHASE.TERMINAL)
             TrackGameStateChanges.SetGameSpeedByState(GameCore.m_state);
 
+        if(phase == BattleEffect.DISP_PHASE.SKILL_WINDOW && ___frame_cnt > 3 && Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0)
+        {
+            ___frame_cnt--;
+        }
+
         if (slow && Application.targetFrameRate > 30 && (Time.frameCount % 2) == 0 && lastPhase == phase)
         {
-            if (RS3UI.enemyName != null)
-            {
-                RS3UI.enemyName.Invoke();
-                RS3UI.enemyName = null;
-            }
             lastPhase = phase;
             return false;
         }
@@ -1904,6 +1911,19 @@ public static class FPSFixWeatherEffect
         }
 
         return false;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_robinMove")]
+public static class FPSFixRobinMove
+{
+    public static void Prefix(int ___npcIndex)
+    {
+        if (___npcIndex >= 0 && GameCore.m_field.m_npc.Count > ___npcIndex && GameCore.m_field.m_npc[___npcIndex].GetSpeedDot() > 1)
+        {
+            //Msg("Fixed Robin speed "+ GameCore.m_field.m_npc[___npcIndex].GetSpeedDot());
+            GameCore.m_field.m_npc[___npcIndex].SetSpeed(0);
+        }
     }
 }
 
@@ -2694,111 +2714,122 @@ public static class DialogOutline
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(GS), "draw_text_mesh")]
-//public static class ThickerOutline
-//{
-//    public class TextInfo
-//    {
-//        public int m_id;
-//        public Color32 m_color;
-//        public GS.FontEffect m_effect;
-//    }
+[HarmonyLib.HarmonyPatch(typeof(GS), "draw_text_mesh")]
+public static class ThickerOutline
+{
+    public static int thickness = 2;
+    public class TextInfo
+    {
+        public int m_id;
+        public Color32 m_color;
+        public GS.FontEffect m_effect;
+    }
 
-//    public static bool Prefix(List<TextInfo> list, Material mtl, Material shadow_mtl, Material rim_mtl, Vector3[] ___m_text_vtx, Vector2[] ___m_text_uv, Color32[] ___m_text_color, Color32[] ___m_rim_color)
-//    {
-//        int count = list.Count;
-//        int[] array = new int[count * 4];
-//        int num = 0;
-//        int num2 = 0;
-//        int num3 = 0;
-//        for (int i = 0; i < list.Count; i++)
-//        {
-//            TextInfo textInfo = list[i];
-//            int num4 = textInfo.m_id * 4;
-//            array[num] = num4;
-//            array[num + 1] = num4 + 1;
-//            array[num + 2] = num4 + 2;
-//            array[num + 3] = num4 + 3;
-//            num += 4;
-//            if ((textInfo.m_effect & GS.FontEffect.SHADOW) != GS.FontEffect.NONE)
-//            {
-//                num2++;
-//            }
-//            if ((textInfo.m_effect & GS.FontEffect.RIM) != GS.FontEffect.NONE)
-//            {
-//                num3++;
-//            }
-//        }
-//        Mesh mesh = GS.GetTempMesh();
-//        mesh.vertices = ___m_text_vtx;
-//        mesh.uv = ___m_text_uv;
-//        mesh.colors32 = ___m_text_color;
-//        mesh.SetIndices(array, MeshTopology.Quads, 0);
-//        Graphics.DrawMesh(mesh, GS.m_font_mtx, mtl, GS.m_cur_layer, GS.m_cur_camera);
-//        if (num2 > 0)
-//        {
-//            array = new int[num2 * 4];
-//            num = 0;
-//            for (int j = 0; j < list.Count; j++)
-//            {
-//                TextInfo textInfo2 = list[j];
-//                if ((textInfo2.m_effect & GS.FontEffect.SHADOW) != GS.FontEffect.NONE)
-//                {
-//                    int num5 = textInfo2.m_id * 4;
-//                    array[num] = num5;
-//                    array[num + 1] = num5 + 1;
-//                    array[num + 2] = num5 + 2;
-//                    array[num + 3] = num5 + 3;
-//                    num += 4;
-//                }
-//            }
-//            mesh = GS.GetTempMesh();
-//            mesh.vertices = ___m_text_vtx;
-//            mesh.uv = ___m_text_uv;
-//            mesh.colors32 = ___m_text_color;
-//            mesh.SetIndices(array, MeshTopology.Quads, 0);
-//            Graphics.DrawMesh(mesh, GS.m_shadow_mtx, shadow_mtl, GS.m_cur_layer, GS.m_cur_camera);
-//        }
-//        if (num3 > 0)
-//        {
-//            Vector3[] array2 = new Vector3[]
-//            {
-//                //new Vector3(-1f, 1f, 0f),
-//                //new Vector3(1f, 1f, 0f),
-//                //new Vector3(-1f, -1f, 0f),
-//                //new Vector3(1f, -1f, 0f),
-//                Vector3.zero
-//            };
-//            for (int k = 0; k < array2.Length; k++)
-//            {
-//                Matrix4x4 matrix4x = default(Matrix4x4);
-//                matrix4x.SetTRS(array2[k], Quaternion.identity, Vector3.one);
-//                array = new int[num3 * 4];
-//                num = 0;
-//                for (int l = 0; l < list.Count; l++)
-//                {
-//                    TextInfo textInfo3 = list[l];
-//                    if ((textInfo3.m_effect & GS.FontEffect.RIM) != GS.FontEffect.NONE)
-//                    {
-//                        int num6 = textInfo3.m_id * 4;
-//                        array[num] = num6;
-//                        array[num + 1] = num6 + 1;
-//                        array[num + 2] = num6 + 2;
-//                        array[num + 3] = num6 + 3;
-//                        num += 4;
-//                    }
-//                }
-//                mesh = GS.GetTempMesh();
-//                mesh.vertices = ___m_text_vtx;
-//                mesh.uv = ___m_text_uv;
-//                mesh.colors32 = ___m_rim_color;
-//                mesh.SetIndices(array, MeshTopology.Quads, 0);
-//                Graphics.DrawMesh(mesh, matrix4x, rim_mtl, 0);
-//            }
-//        }
-//        return false;
-//    }
-//}
+    public static bool Prefix(List<TextInfo> list, Material mtl, Material shadow_mtl, Material rim_mtl, Vector3[] ___m_text_vtx, Vector2[] ___m_text_uv, Color32[] ___m_text_color, Color32[] ___m_rim_color)
+    {
+        int count = list.Count;
+        int[] array = new int[count * 4];
+        int num = 0;
+        int num2 = 0;
+        int num3 = 0;
+        for (int i = 0; i < list.Count; i++)
+        {
+            TextInfo textInfo = list[i];
+            int num4 = textInfo.m_id * 4;
+            array[num] = num4;
+            array[num + 1] = num4 + 1;
+            array[num + 2] = num4 + 2;
+            array[num + 3] = num4 + 3;
+            num += 4;
+            if ((textInfo.m_effect & GS.FontEffect.SHADOW) != GS.FontEffect.NONE)
+            {
+                num2++;
+            }
+            if ((textInfo.m_effect & GS.FontEffect.RIM) != GS.FontEffect.NONE)
+            {
+                num3++;
+            }
+        }
+        Mesh mesh = GS.GetTempMesh();
+        mesh.vertices = ___m_text_vtx;
+        mesh.uv = ___m_text_uv;
+        mesh.colors32 = ___m_text_color;
+        mesh.SetIndices(array, MeshTopology.Quads, 0);
+        Graphics.DrawMesh(mesh, GS.m_font_mtx, mtl, GS.m_cur_layer, GS.m_cur_camera);
+        if (num2 > 0)
+        {
+            array = new int[num2 * 4];
+            num = 0;
+            for (int j = 0; j < list.Count; j++)
+            {
+                TextInfo textInfo2 = list[j];
+                if ((textInfo2.m_effect & GS.FontEffect.SHADOW) != GS.FontEffect.NONE)
+                {
+                    int num5 = textInfo2.m_id * 4;
+                    array[num] = num5;
+                    array[num + 1] = num5 + 1;
+                    array[num + 2] = num5 + 2;
+                    array[num + 3] = num5 + 3;
+                    num += 4;
+                }
+            }
+            mesh = GS.GetTempMesh();
+            mesh.vertices = ___m_text_vtx;
+            mesh.uv = ___m_text_uv;
+            mesh.colors32 = ___m_text_color;
+            mesh.SetIndices(array, MeshTopology.Quads, 0);
+            Graphics.DrawMesh(mesh, GS.m_shadow_mtx, shadow_mtl, GS.m_cur_layer, GS.m_cur_camera);
+        }
+        if (num3 > 0)
+        {
+            Vector3[] array2 = new Vector3[]
+            {
+                new Vector3(0f, 1f, 0f),
+                new Vector3(0f, -1f, 0f),
+                new Vector3(1f, 0f, 0f),
+                new Vector3(-1f, 0f, 0f),
+                new Vector3(-1f, 1f, 0f),
+                new Vector3(1f, 1f, 0f),
+                new Vector3(-1f, -1f, 0f),
+                new Vector3(1f, -1f, 0f)
+            };
+
+            for (int k = 0; k < array2.Length; k++)
+            {
+                for (int t = 0; t < thickness/2; t++)
+                {
+                    Matrix4x4 matrix4x = default(Matrix4x4);
+                    matrix4x.SetTRS(array2[k]*(0.8f+0.2f*thickness*t), Quaternion.identity, Vector3.one);
+                    array = new int[num3 * 4];
+                    num = 0;
+                    for (int l = 0; l < list.Count; l++)
+                    {
+                        TextInfo textInfo3 = list[l];
+                        if ((textInfo3.m_effect & GS.FontEffect.RIM) != GS.FontEffect.NONE)
+                        {
+                            int num6 = textInfo3.m_id * 4;
+                            array[num] = num6;
+                            array[num + 1] = num6 + 1;
+                            array[num + 2] = num6 + 2;
+                            array[num + 3] = num6 + 3;
+                            num += 4;
+                        }
+                    }
+                    mesh = GS.GetTempMesh();
+                    mesh.vertices = ___m_text_vtx;
+                    mesh.uv = ___m_text_uv;
+                    mesh.colors32 = ___m_rim_color;
+                    mesh.SetIndices(array, MeshTopology.Quads, 0);
+                    Color c = rim_mtl.color;
+                    c.a = 1f - t * 0.2f;
+                    rim_mtl.color = c;
+                    Graphics.DrawMesh(mesh, matrix4x, rim_mtl, 0);
+                }
+            }
+        }
+        return false;
+    }
+}
 
 [HarmonyLib.HarmonyPatch(typeof(MessageWindow), HarmonyLib.MethodType.Constructor, new Type[] { typeof(int) })]
 public static class CompactDialog
@@ -2871,7 +2902,7 @@ public static class CompactUI
 {
     public static void Postfix(ref int __result)
     {
-        __result = Mathf.Max(__result, 80);
+        __result = __result+Mathf.Max(100-__result, 0) / 2;
     }
 }
 
@@ -3236,6 +3267,7 @@ public static class TextPosition
 {
     public static bool Prefix(string str, ref int _x, ref int _y, int _z, Color32 color, ref GS.FontEffect effect, int base_point_x, int base_pont_y, ref float scale)
     {
+        ThickerOutline.thickness = 2;
         if (RS3UI.windowType.Contains("Command"))
         {
             scale = 1.0f;
@@ -3271,11 +3303,6 @@ public static class TextPosition
         {
             effect = GS.FontEffect.RIM;
             _x = 650;
-        }
-        else
-        {
-            int x = _x; int y = _y; GS.FontEffect eff = effect; float s = scale;
-            RS3UI.enemyName = () => GS.DrawStringMenu(str, x, y, _z, color,  eff, base_point_x, base_pont_y, s);
         }
         return true;
     }
@@ -3583,13 +3610,18 @@ public static class TextReplace3
 [HarmonyLib.HarmonyPatch(typeof(GS), "DrawString")]
 public static class TextOutline
 {
-    public static void Prefix(ref Color32 color, ref GS.FontEffect effect)
+    public static void Prefix(string str, int _x, int _y, int _z, ref Color32 color, ref GS.FontEffect effect)
     {
-        //GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
+        if (RS3UI.windowType.StartsWith("Background"))
+        {
+            effect |= GS.FontEffect.RIM;
+            ThickerOutline.thickness = RS3UI.windowType.IndexOf('0') >= 0 ? 2 : 4;
+        }
+
         if (GameCore.m_userProfile.language == 0)
         {
             GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
-            //GS.FontSize = 24f;
+            ThickerOutline.thickness += ThickerOutline.thickness;
         }
 
         if (RS3UI.windowType == "CommandSelect")
@@ -3599,10 +3631,6 @@ public static class TextOutline
         if ((effect & GS.FontEffect.SHADOW) > 0 && color.r <= 0 && color.a > 0)
             GS.m_shadow_mtl[0].color = new Color32(0, 0, 0, 127);
 
-        if (RS3UI.windowType.StartsWith("Background"))
-        {
-            effect |= GS.FontEffect.RIM;
-        }
 
         if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0 && GameCore.m_state == GameCore.State.OPENNING)
             effect |= GS.FontEffect.RIM_WINDOW;
@@ -3651,7 +3679,7 @@ public static class FontChange
             foreach (string s in ab.GetAllAssetNames())
                 Msg(s);
             GS.m_font[(int)type] = ab.LoadAsset<Font>("rs3font.ttf");
-            Msg("Loaded rs3font.ttf");
+            Msg("Loaded rs3font");
             ab.Unload(false);
         }
         else
@@ -3889,7 +3917,6 @@ namespace RS3
         public static int frame = 0;
         public static string replace = "";
         public static Vector2 rasterparameter = new Vector2(0f,0.02f);
-        public static Action enemyName = null;
         public static int prints = 0;
         public static int descLineLen = 85;
         public static Dictionary<string, string> replacements = new Dictionary<string, string>();
