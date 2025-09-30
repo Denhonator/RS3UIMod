@@ -53,6 +53,7 @@ public class Settings
 
     public bool interpolate = true;
     public bool displayParam = true;
+    public bool mapAnywhere = false;
     //public bool disableAnim = false;
 }
 
@@ -351,6 +352,10 @@ public static class FPSFixTextFade
         {
             array[3] = (int.Parse(array[3]) * 2).ToString();
         }
+        //if(cmd.Contains("ssMovie") && s.Contains("set end"))
+        //{
+        //    FPSFixInterpolateSSMovie.active = false;
+        //}
         if (cmd.Contains("staff"))
         {
             HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_zoom_frame").SetValue(60);
@@ -358,6 +363,12 @@ public static class FPSFixTextFade
             HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_fade_frame").SetValue(60);
             HarmonyLib.Traverse.Create(typeof(ScriptDrive)).Field("s_staff_scroll_speed").SetValue(2);
             RemoveExtraWhitespace.active = false;
+        }
+        if (cmd == "fill" && s.StartsWith("$00$03$01#2100"))
+        {
+            //Msg("Gwayne fix");
+            GameCore.m_escape_counter = 30;
+            __instance.messageFrame = true;
         }
     }
 }
@@ -653,6 +664,17 @@ public static class FPSFixInterpolateSS3
             return;
         else if (!Excluded(__instance.m_fname))
             frame *= 2;
+    }
+}
+
+//This fixes Vanguard
+[HarmonyLib.HarmonyPatch(typeof(EventUtil), "GetEndFrameSSMovie")]
+public static class FPSFixInterpolateSSMovie
+{
+    static void Postfix(ref int __result, int index)
+    {
+        if(EventUtil.spriteMovieData[index].m_anime != null && EventUtil.spriteMovieData[index].m_anime[EventUtil.spriteMovieData[index].m_cur_anim_idx].m_name.Contains("van_take_off"))
+            __result /= 2;
     }
 }
 
@@ -2293,6 +2315,89 @@ public static class FPSFixBattleMess
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(GameCore), "BattleEnd")]
+public static class FPSFixBattleEndInv
+{
+    public static void Prefix(ref bool __state)
+    {
+        __state = GameCore.m_state != GameCore.State.FIELD;
+    }
+    public static void Postfix(ref bool __state)
+    {
+        if (__state && GameCore.m_escape_counter == 8)
+            GameCore.m_escape_counter = 16;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Field), "Update")]
+public static class MapAnywhere
+{
+    public static void Prefix(Field __instance, ref int ___m_next_map_no, ref int ___m_next_map_x, ref int ___m_next_map_y, ref int ___m_next_map_dir)
+    {
+        if (!Settings.instance.mapAnywhere)
+            return;
+        if (__instance.m_uifield != null && __instance.m_map_info.m_exit_jump == 0)
+        {
+            __instance.m_uifield.SetVisibleWorldButton(true);
+            __instance.m_map_info.m_exit_jump = 0x1600;
+        }
+
+        if (__instance.m_state == Field.State.MAPJUMP && GS.FadeIsEnd() && !SaveData.IsCurrentSaveLoad() && ((___m_next_map_no & 65535) >> 10) == 19 && __instance.m_player.m_pic_no >= 8)
+        {
+            __instance.UpdateNormal();
+            if (GS.FadeIsEnd() && !SaveData.IsCurrentSaveLoad())
+            {
+                int bgm = __instance.m_player.m_pic_no + 1;
+                //bgm = bgm >= 19 && bgm <= 26 ? bgm + 8 : bgm;
+                ___m_next_map_no = ___m_next_map_no + (bgm << 10);
+                __instance.MapJump(___m_next_map_no, ___m_next_map_x, ___m_next_map_y, ___m_next_map_dir, false);
+                __instance.UpdateNormal();
+                if (__instance.m_fader_on || __instance.m_fader_in_on)
+                {
+                    GS.m_fade_delay = 2;
+                    if (__instance.m_fade_white)
+                    {
+                        GS.FadeIn_White(20);
+                    }
+                    else
+                    {
+                        GS.FadeIn(20);
+                    }
+                    __instance.m_fader_in_on = false;
+                    __instance.m_fader_on = true;
+                }
+                __instance.m_state = Field.State.MAPJUMP_END;
+                __instance.m_black_map = false;
+                __instance.m_fade_white = false;
+            }
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(KeyInput), "Update")]
+public static class DoubleInputFix
+{
+    public static void Prefix(int ___m_prevKeyRepeat, ref int __state)
+    {
+        __state = ___m_prevKeyRepeat;
+    }
+    public static void Postfix(KeyInput __instance, ref int[] ___m_inputOne, ref int[] ___m_inputMenuRepeat, ref int __state)
+    {
+        if(__state > ___m_inputMenuRepeat[0] && ___m_inputOne[0] == 0)
+        {
+            ___m_inputMenuRepeat[0] = 0;
+            ___m_inputMenuRepeat[1] = 0;
+        }
+
+        if(___m_inputOne[0] > 0)
+        {
+            ___m_inputMenuRepeat[0] = ___m_inputOne[0];
+            ___m_inputMenuRepeat[1] = ___m_inputOne[1];
+            //Msg(___m_inputOne[0]);
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(MessageWindow), "ResettingMessSpeed")]
 public static class MessageSpeed
 {
@@ -2331,6 +2436,23 @@ public static class ActionFixes
         actionRow[5681] = actionRow[5681].Replace("scroll,down,8", "scroll,down,11"); //Maximus reveal scroll fix
     }
 }
+
+//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "ParseScript")]
+//public static class ScriptFixes
+//{
+//    public static void Prefix(ref string[] r3scriptRowIn)
+//    {
+//    }
+//}
+
+//[HarmonyLib.HarmonyPatch(typeof(ActionVM), "MoveCharacter")]
+//public static class FPSFixMoveChar
+//{
+//    public static void Prefix(ref int frameCount)
+//    {
+//        frameCount *= 2;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(Image), "reload_texture")]
 public static class ReplaceCharacterTexture
@@ -2557,6 +2679,126 @@ public static class WhiteText
             col = 3;
     }
 }
+
+[HarmonyLib.HarmonyPatch(typeof(Window), "Draw")]
+public static class DialogOutline
+{
+    public static void Prefix(Window __instance)
+    {
+        RS3UI.windowType = "Background"+__instance.m_type;
+    }
+
+    public static void Postfix()
+    {
+        RS3UI.windowType = "";
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(GS), "draw_text_mesh")]
+//public static class ThickerOutline
+//{
+//    public class TextInfo
+//    {
+//        public int m_id;
+//        public Color32 m_color;
+//        public GS.FontEffect m_effect;
+//    }
+
+//    public static bool Prefix(List<TextInfo> list, Material mtl, Material shadow_mtl, Material rim_mtl, Vector3[] ___m_text_vtx, Vector2[] ___m_text_uv, Color32[] ___m_text_color, Color32[] ___m_rim_color)
+//    {
+//        int count = list.Count;
+//        int[] array = new int[count * 4];
+//        int num = 0;
+//        int num2 = 0;
+//        int num3 = 0;
+//        for (int i = 0; i < list.Count; i++)
+//        {
+//            TextInfo textInfo = list[i];
+//            int num4 = textInfo.m_id * 4;
+//            array[num] = num4;
+//            array[num + 1] = num4 + 1;
+//            array[num + 2] = num4 + 2;
+//            array[num + 3] = num4 + 3;
+//            num += 4;
+//            if ((textInfo.m_effect & GS.FontEffect.SHADOW) != GS.FontEffect.NONE)
+//            {
+//                num2++;
+//            }
+//            if ((textInfo.m_effect & GS.FontEffect.RIM) != GS.FontEffect.NONE)
+//            {
+//                num3++;
+//            }
+//        }
+//        Mesh mesh = GS.GetTempMesh();
+//        mesh.vertices = ___m_text_vtx;
+//        mesh.uv = ___m_text_uv;
+//        mesh.colors32 = ___m_text_color;
+//        mesh.SetIndices(array, MeshTopology.Quads, 0);
+//        Graphics.DrawMesh(mesh, GS.m_font_mtx, mtl, GS.m_cur_layer, GS.m_cur_camera);
+//        if (num2 > 0)
+//        {
+//            array = new int[num2 * 4];
+//            num = 0;
+//            for (int j = 0; j < list.Count; j++)
+//            {
+//                TextInfo textInfo2 = list[j];
+//                if ((textInfo2.m_effect & GS.FontEffect.SHADOW) != GS.FontEffect.NONE)
+//                {
+//                    int num5 = textInfo2.m_id * 4;
+//                    array[num] = num5;
+//                    array[num + 1] = num5 + 1;
+//                    array[num + 2] = num5 + 2;
+//                    array[num + 3] = num5 + 3;
+//                    num += 4;
+//                }
+//            }
+//            mesh = GS.GetTempMesh();
+//            mesh.vertices = ___m_text_vtx;
+//            mesh.uv = ___m_text_uv;
+//            mesh.colors32 = ___m_text_color;
+//            mesh.SetIndices(array, MeshTopology.Quads, 0);
+//            Graphics.DrawMesh(mesh, GS.m_shadow_mtx, shadow_mtl, GS.m_cur_layer, GS.m_cur_camera);
+//        }
+//        if (num3 > 0)
+//        {
+//            Vector3[] array2 = new Vector3[]
+//            {
+//                //new Vector3(-1f, 1f, 0f),
+//                //new Vector3(1f, 1f, 0f),
+//                //new Vector3(-1f, -1f, 0f),
+//                //new Vector3(1f, -1f, 0f),
+//                Vector3.zero
+//            };
+//            for (int k = 0; k < array2.Length; k++)
+//            {
+//                Matrix4x4 matrix4x = default(Matrix4x4);
+//                matrix4x.SetTRS(array2[k], Quaternion.identity, Vector3.one);
+//                array = new int[num3 * 4];
+//                num = 0;
+//                for (int l = 0; l < list.Count; l++)
+//                {
+//                    TextInfo textInfo3 = list[l];
+//                    if ((textInfo3.m_effect & GS.FontEffect.RIM) != GS.FontEffect.NONE)
+//                    {
+//                        int num6 = textInfo3.m_id * 4;
+//                        array[num] = num6;
+//                        array[num + 1] = num6 + 1;
+//                        array[num + 2] = num6 + 2;
+//                        array[num + 3] = num6 + 3;
+//                        num += 4;
+//                    }
+//                }
+//                mesh = GS.GetTempMesh();
+//                mesh.vertices = ___m_text_vtx;
+//                mesh.uv = ___m_text_uv;
+//                mesh.colors32 = ___m_rim_color;
+//                mesh.SetIndices(array, MeshTopology.Quads, 0);
+//                Graphics.DrawMesh(mesh, matrix4x, rim_mtl, 0);
+//            }
+//        }
+//        return false;
+//    }
+//}
 
 [HarmonyLib.HarmonyPatch(typeof(MessageWindow), HarmonyLib.MethodType.Constructor, new Type[] { typeof(int) })]
 public static class CompactDialog
@@ -3343,6 +3585,7 @@ public static class TextOutline
 {
     public static void Prefix(ref Color32 color, ref GS.FontEffect effect)
     {
+        //GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
         if (GameCore.m_userProfile.language == 0)
         {
             GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
@@ -3356,8 +3599,13 @@ public static class TextOutline
         if ((effect & GS.FontEffect.SHADOW) > 0 && color.r <= 0 && color.a > 0)
             GS.m_shadow_mtl[0].color = new Color32(0, 0, 0, 127);
 
+        if (RS3UI.windowType.StartsWith("Background"))
+        {
+            effect |= GS.FontEffect.RIM;
+        }
+
         if (effect == GS.FontEffect.SHADOW_WINDOW && color.r > 0 && color.a > 0 && GameCore.m_state == GameCore.State.OPENNING)
-            effect = GS.FontEffect.RIM_WINDOW;
+            effect |= GS.FontEffect.RIM_WINDOW;
     }
 
     public static void Postfix(ref Color32 color)

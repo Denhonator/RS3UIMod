@@ -17,6 +17,9 @@
     <Reference Include="MelonLoader">
       <HintPath>F:\SteamLibrary\steamapps\common\RomancingSaGa3\MelonLoader\net35\MelonLoader.dll</HintPath>
     </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>F:\SteamLibrary\steamapps\common\RomancingSaGa3\rs3_Data\Managed\Rewired_Core.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>F:\SteamLibrary\steamapps\common\RomancingSaGa3\rs3_Data\Managed\UnityEngine.dll</HintPath>
     </Reference>
