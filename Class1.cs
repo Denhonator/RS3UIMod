@@ -2479,13 +2479,20 @@ public static class ActionFixes
     }
 }
 
-//[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "ParseScript")]
-//public static class ScriptFixes
-//{
-//    public static void Prefix(ref string[] r3scriptRowIn)
-//    {
-//    }
-//}
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "ParseScript")]
+public static class ScriptFixes
+{
+    public static void Prefix(ref string[] r3scriptRowIn)
+    {
+        r3scriptRowIn[14829] = r3scriptRowIn[14829].Replace("winSizeS", "winSizeM");
+        r3scriptRowIn[14833] = r3scriptRowIn[14833].Replace("Would you ", "Would you recognize him?");
+        r3scriptRowIn[14834] = r3scriptRowIn[14834].Replace("*pause", "");
+        r3scriptRowIn[14835] = r3scriptRowIn[14835].Replace("recognize him?", "");
+        r3scriptRowIn[14839] = r3scriptRowIn[14839].Replace("Think you could", "Think you could recognize him?");
+        r3scriptRowIn[14840] = r3scriptRowIn[14840].Replace("*pause", "");
+        r3scriptRowIn[14841] = r3scriptRowIn[14841].Replace(" recognize him?", "");
+    }
+}
 
 //[HarmonyLib.HarmonyPatch(typeof(ActionVM), "MoveCharacter")]
 //public static class FPSFixMoveChar
