@@ -2889,6 +2889,20 @@ public static class WhiteTextTrade
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(MenuAcquisitionMain), "SetVisibleCommand")]
+public static class WhiteTextTrade2
+{
+    public static void Postfix(bool isVisible, MenuObjectFont ___m_playerText, MenuObjectFont ___m_commonText, MenuManager ___m_menuManager, int ___m_selectMax, MenuBase __instance, string[] ___m_touchList)
+    {
+        for (int i = 0; i < ___m_selectMax; i++)
+        {
+            ((MenuObjectFont)__instance.GetMenuObjectBase(___m_touchList[i])).SetColor(1);
+            ((MenuObjectFont)__instance.GetMenuObjectBase(___m_touchList[i])).SetFontEffect(GS.FontEffect.RIM);
+            HarmonyLib.Traverse.Create(__instance).Field("m_flashText").GetValue<MenuFlashText>().SetFlashColor(1f, 0, 0);
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "SetMessageWindowByNPC")]
 public static class TextBoxHeight2
 {
