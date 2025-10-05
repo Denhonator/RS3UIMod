@@ -962,6 +962,27 @@ public static class FPSFixTriSh
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_lightball_calc")]
+public static class FPSFixLightBall
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_8).opcode || (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 8f))
+            {
+                HarmonyLib.CodeInstruction newCode = code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_8).opcode ? 
+                                                                    new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, 16) :
+                                                                    new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 16f);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_gliderspike")]
 public static class FPSFixGliderSpike
 {
@@ -2187,7 +2208,8 @@ public static class FPSFixMovement
                 }
                 ch.m_moving = false;
                 int dir = ch.m_dir;
-                __instance.CharaMove(ch, ch.m_cmd_dir, ch.m_cmd_force, false);
+                if(ch.m_cmd_dir>=0)
+                    __instance.CharaMove(ch, ch.m_cmd_dir, ch.m_cmd_force, false);
                 if (ch.m_cmd_opt == 2)
                 {
                     ch.SetDir(dir);
@@ -2951,6 +2973,7 @@ public static class CommandDrawAll
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawCommandSkill");
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawCommnadSpell");
         yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "PageDrawMaterialSkill");
+        yield return HarmonyLib.AccessTools.Method(typeof(CommandMode), "CommandInputUpdate");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "SetMenuScroll");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PushDownButton");
         yield return HarmonyLib.AccessTools.Method(typeof(CommanderMode), "PageDrawBackPack");
