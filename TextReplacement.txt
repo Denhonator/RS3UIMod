@@ -8,3 +8,5 @@ This fusion spell sends enemies to the great unknown and places casters in the P
 This fusion spell sends enemies to the great unknown. Place casters in the Seer's Focus formation.
 This fusion spell deals damage to all enemies and places casters in the Genbu formation.
 This fusion spell deals damage to all enemies. Place casters in the Genbu Stance formation.
+[Attack/Long/Single Foe] Attack with your bow to blind the enemy.
+[Attack/Near/All Foes] Attack with your bow to blind the enemy.
