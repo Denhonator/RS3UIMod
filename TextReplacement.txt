@@ -10,3 +10,5 @@ This fusion spell deals damage to all enemies and places casters in the Genbu fo
 This fusion spell deals damage to all enemies. Place casters in the Genbu Stance formation.
 [Attack/Long/Single Foe] Attack with your bow to blind the enemy.
 [Attack/Near/All Foes] Attack with your bow to blind the enemy.
+[Attack/Long/Single Foe] Attack and charm the enemy with an ultrasonic shot.
+[Attack/Near/All Foes] Attack and charm enemies with an ultrasonic shot.

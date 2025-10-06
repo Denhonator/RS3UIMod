@@ -53,6 +53,7 @@ public class Settings
 
     public bool interpolate = true;
     public bool displayParam = true;
+    public bool detailedParam = true;
     public bool mapAnywhere = false;
     //public bool disableAnim = false;
 }
@@ -748,6 +749,10 @@ public static class FPSFixInterpolateSS
 {
     static int newi = 0;
     public static Dictionary<string, bool> doubled = new Dictionary<string, bool>();
+    static Dictionary<string, Vector3[]> vtx_arrays = new Dictionary<string, Vector3[]>();
+    static Dictionary<string, Vector2[]> uv_arrays = new Dictionary<string, Vector2[]>();
+    static Dictionary<string, Color32[]> color_arrays = new Dictionary<string, Color32[]>();
+    static Dictionary<string, SSObject.Frame[]> frame_arrays = new Dictionary<string, SSObject.Frame[]>();
 
     public static bool Excluded(string s)
     {
@@ -757,9 +762,17 @@ public static class FPSFixInterpolateSS
     static void Postfix(SSObject.Anime __instance)
     {
         bool interpolateThis = Settings.instance.interpolate && !Excluded(__instance.m_ssobj.m_fname);
+        bool inMemory = vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) && interpolateThis;
         float threshold = __instance.m_ssobj.m_fname.Contains("souryuha") ? 50f 
                         : __instance.m_ssobj.m_fname.Contains("monster") ? 5f : 10f;
-        if (interpolateThis && !doubled.ContainsKey(__instance.m_ssobj.m_fname))
+
+        if (inMemory)
+        {
+            __instance.m_ssobj.m_vtx_array = vtx_arrays[__instance.m_ssobj.m_fname];
+            __instance.m_ssobj.m_uv_array = uv_arrays[__instance.m_ssobj.m_fname];
+            __instance.m_ssobj.m_color_array = color_arrays[__instance.m_ssobj.m_fname];
+        }
+        else if (interpolateThis && !doubled.ContainsKey(__instance.m_ssobj.m_fname))
         {
             Vector3[] newVertcises = new Vector3[__instance.m_ssobj.m_vtx_array.Length * 2];
             __instance.m_ssobj.m_vtx_array.CopyTo(newVertcises, 0);
@@ -782,9 +795,11 @@ public static class FPSFixInterpolateSS
             newi = newVertcises.Length / 2;
         }
 
-        SSObject.Frame[] newFrames = new SSObject.Frame[__instance.m_frames.Length * 2];
+        SSObject.Frame[] newFrames = inMemory ? frame_arrays[__instance.m_ssobj.m_fname] : new SSObject.Frame[__instance.m_frames.Length * 2];
         for (int i = 0; i < __instance.m_frames.Length; i++)
         {
+            if (inMemory)
+                break;
             int i2 = (i + 1) % __instance.m_frames.Length;
             string printBuffer = "";
             for (int j = 0; j < 2; j++)
@@ -868,6 +883,15 @@ public static class FPSFixInterpolateSS
         }
         if (RS3UI.prints > 0)
             Msg(__instance.m_name);
+
+        if (interpolateThis && !vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) && __instance.m_ssobj.m_fname.Contains("effect"))
+        {
+            vtx_arrays[__instance.m_ssobj.m_fname] = __instance.m_ssobj.m_vtx_array;
+            uv_arrays[__instance.m_ssobj.m_fname] = __instance.m_ssobj.m_uv_array;
+            color_arrays[__instance.m_ssobj.m_fname] = __instance.m_ssobj.m_color_array;
+            frame_arrays[__instance.m_ssobj.m_fname] = newFrames;
+        }
+
         __instance.m_frames = newFrames;
         __instance.m_end_frame = newFrames.Length + 
             (newFrames.Length > 30 && __instance.m_name.Contains("anime_1") && __instance.m_ssobj.m_fname.Contains("monster") ? -2 : 0);
@@ -3311,6 +3335,8 @@ public static class TextPosition
 {
     public static bool Prefix(string str, ref int _x, ref int _y, int _z, Color32 color, ref GS.FontEffect effect, int base_point_x, int base_pont_y, ref float scale)
     {
+        if (color == Color.white && effect == GS.FontEffect.SHADOW)
+            effect = GS.FontEffect.RIM;
         ThickerOutline.thickness = 2;
         if (RS3UI.windowType.Contains("Command"))
         {
@@ -3941,17 +3967,14 @@ public static class ParamDownMsg2
 [HarmonyLib.HarmonyPatch(typeof(BattleMenu.Info.BattleMenuBadStatusInfo), "GetBadStatusInfo")]
 public static class ParamStatusDisplay
 {
-    public static void Postfix(int idx, ref string[] __result)
+    public static List<string> ParamStatusList(BattleLogic.BattleUnit battleUnit)
     {
-        if (!Settings.instance.displayParam)
-            return;
-        BattleLogic.BattleUnit battleUnit = GameCore.m_battle._unit_enemys[idx];
         int def = battleUnit._defense_manager._def_up;
         int mdf = battleUnit._defense_manager._magic_def_up;
-        int defdown = HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_def_down").GetValue<int>()
-                    + HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_physic_def_down").GetValue<int>()
-                    + HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_magic_def_down").GetValue<int>()
-                    + (HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_physic_def_half").GetValue<bool>() ? 1 : 0);
+        int defdown = HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_def_down").GetValue<int>();
+        int pdefdown = HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_physic_def_down").GetValue<int>();
+        int mdfdown = HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_magic_def_down").GetValue<int>();
+        bool defhalf = HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_physic_def_half").GetValue<bool>();
 
         int cha = battleUnit._fascination._rise_value - battleUnit._fascination._fall_value;
         int wil = battleUnit._will._rise_value - battleUnit._will._fall_value;
@@ -3961,34 +3984,52 @@ public static class ParamStatusDisplay
         int dex = battleUnit._dexterity._rise_value - battleUnit._dexterity._fall_value;
         int str = battleUnit._strength._rise_value - battleUnit._strength._fall_value;
 
-        List<string> newList = __result.ToList();
-        if (def != 0 || mdf != 0)
-            newList.Add("DEF UP");
+        List<string> newList = new List<string>();
+        if (def != 0)
+            newList.Add("DEF +" + def.ToString());
+        if (mdf != 0)
+            newList.Add("MDF +" + mdf.ToString());
         if (defdown != 0)
-            newList.Add("DEF DOWN");
-        if (cha > 0 && wil > 0 && mag > 0 && sta > 0 && agi > 0 && dex > 0 && str > 0)
-            newList.Add("ALL UP");
-        else if (cha < 0 && wil < 0 && mag < 0 && sta < 0 && agi < 0 && dex < 0 && str < 0)
-            newList.Add("ALL DOWN");
-        else
+            newList.Add("DEF -" + defdown.ToString());
+        if (pdefdown != 0)
+            newList.Add("PDF -" + pdefdown.ToString());
+        if (mdfdown != 0)
+            newList.Add("MDF -" + mdfdown.ToString());
+        if (defhalf)
+            newList.Add("PDF HALF");
+        if (cha != 0)
+            newList.Add("CHA " + cha.ToString("+0;-#"));
+        if (wil != 0)
+            newList.Add("WIL " + wil.ToString("+0;-#"));
+        if (mag != 0)
+            newList.Add("MAG " + mag.ToString("+0;-#"));
+        if (sta != 0)
+            newList.Add("STA " + sta.ToString("+0;-#"));
+        if (agi != 0)
+            newList.Add("AGI " + agi.ToString("+0;-#"));
+        if (dex != 0)
+            newList.Add("DEX " + dex.ToString("+0;-#"));
+        if (str != 0)
+            newList.Add("STR " + str.ToString("+0;-#"));
+
+        return newList;
+    }
+
+    public static void Postfix(int idx, ref string[] __result)
+    {
+        if (!Settings.instance.detailedParam)
+            return;
+        BattleLogic.BattleUnit battleUnit = GameCore.m_battle._unit_enemys[idx];
+        List<string> newList = ParamStatusList(battleUnit);
+        if (newList.Count == 0)
+            return;
+
+        foreach(string s in __result)
         {
-            if (cha != 0)
-                newList.Add("CHA " + cha.ToString("+0;-#"));
-            if (wil != 0)
-                newList.Add("WIL " + wil.ToString("+0;-#"));
-            if (mag != 0)
-                newList.Add("MAG " + mag.ToString("+0;-#"));
-            if (sta != 0)
-                newList.Add("STA " + sta.ToString("+0;-#"));
-            if (agi != 0)
-                newList.Add("AGI " + agi.ToString("+0;-#"));
-            if (dex != 0)
-                newList.Add("DEX " + dex.ToString("+0;-#"));
-            if (str != 0)
-                newList.Add("STR " + str.ToString("+0;-#"));
+            if (s.Length > 1)
+                newList.Insert(0, s);
         }
-        if (newList.Count > 1 && newList[0].Length < 2)
-            newList.RemoveAt(0);
+
         __result = newList.ToArray();
     }
 }
@@ -4006,6 +4047,33 @@ public static class ParamStatusDisplay2
                 yield return code;
         }
     }
+
+    static void Postfix()
+    {
+        if (BattleWork.demo_battle_flag || !Settings.instance.detailedParam)
+            return;
+
+        List<Character> party_ch = BattleEffect.m_party_ch;
+        BattleLogic.BattleUnit[] unit_players = GameCore.m_battle._unit_players;
+
+        System.Reflection.MethodInfo dynMethod = typeof(BattleUIInfo).GetMethod("GetPositioning",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Vector2[] positioning = (Vector2[])dynMethod.Invoke(typeof(BattleUIInfo), null);
+
+        for(int i=0; i < unit_players.Length; i++)
+        {
+            if(!unit_players[i]._is_not_join_flag && !unit_players[i]._general_flag && !unit_players[i]._empty_flag && unit_players[i]._player_or_enemy_id != 282)
+            {
+                int x = party_ch[i].m_x + (positioning[i].x > 72f ? 0 : 15);
+                int y = party_ch[i].m_y - 5;
+                List<string> paramList = ParamStatusDisplay.ParamStatusList(unit_players[i]);
+                if (paramList.Count == 0)
+                    continue;
+                int index = (int)(Time.unscaledTime / 1.5f) % paramList.Count;
+                GS.DrawStringMenu(paramList[index], x, y, 0, Color.white, GS.FontEffect.RIM, 2, 3, 0.65f);
+            }
+        }
+    }
 }
 
 [HarmonyLib.HarmonyPatch(typeof(SeadCategoryGUIController), "OnGUI")]
@@ -4015,7 +4083,8 @@ public static class GUIButtons
     {
         //GUI.Label(new Rect(8, 70, 96f, 32f), "");
         Settings.instance.interpolate = GUI.Toggle(new Rect(8, 88, 200f, 32f), Settings.instance.interpolate, "Interpolation");
-        Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 200f, 32f), Settings.instance.displayParam, "Display buff/debuff");
+        Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 250f, 32f), Settings.instance.displayParam, "Display buff/debuff upon landing");
+        Settings.instance.detailedParam = GUI.Toggle(new Rect(8, 152, 250f, 32f), Settings.instance.detailedParam, "Display buff/debuff between turns");
         //Settings.instance.disableAnim = GUI.Toggle(new Rect(8, 152, 200f, 32f), Settings.instance.disableAnim, "Disable boss anim");
     }
 }
@@ -4071,6 +4140,15 @@ namespace RS3
             {
                 prints = (prints + 1) % 3;
             }
+            //if (Input.GetKeyDown(KeyCode.F2))
+            //{
+            //    string s = "";
+            //    foreach(CommandSkillData data in BattleDataList.commandSkillDataList)
+            //    {
+            //        s += data.nameJpn + "," + data.nameEng + "," + data.descJpn + "," + data.descEng + "\n";
+            //    }
+            //    File.WriteAllText("commandSkillDataList.txt", s);
+            //}
             if (Input.GetKeyDown(KeyCode.PageDown) || Input.GetKeyDown(KeyCode.JoystickButton9))
             {
                 TrackGameStateChanges.IncrementCurrentGameStateSpeed();
