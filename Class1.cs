@@ -3938,6 +3938,76 @@ public static class ParamDownMsg2
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleMenu.Info.BattleMenuBadStatusInfo), "GetBadStatusInfo")]
+public static class ParamStatusDisplay
+{
+    public static void Postfix(int idx, ref string[] __result)
+    {
+        if (!Settings.instance.displayParam)
+            return;
+        BattleLogic.BattleUnit battleUnit = GameCore.m_battle._unit_enemys[idx];
+        int def = battleUnit._defense_manager._def_up;
+        int mdf = battleUnit._defense_manager._magic_def_up;
+        int defdown = HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_def_down").GetValue<int>()
+                    + HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_physic_def_down").GetValue<int>()
+                    + HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_magic_def_down").GetValue<int>()
+                    + (HarmonyLib.Traverse.Create(battleUnit._defense_manager).Field("_physic_def_half").GetValue<bool>() ? 1 : 0);
+
+        int cha = battleUnit._fascination._rise_value - battleUnit._fascination._fall_value;
+        int wil = battleUnit._will._rise_value - battleUnit._will._fall_value;
+        int mag = battleUnit._force._rise_value - battleUnit._force._fall_value;
+        int sta = battleUnit._endure._rise_value - battleUnit._endure._fall_value;
+        int agi = battleUnit._agility._rise_value - battleUnit._agility._fall_value;
+        int dex = battleUnit._dexterity._rise_value - battleUnit._dexterity._fall_value;
+        int str = battleUnit._strength._rise_value - battleUnit._strength._fall_value;
+
+        List<string> newList = __result.ToList();
+        if (def != 0 || mdf != 0)
+            newList.Add("DEF UP");
+        if (defdown != 0)
+            newList.Add("DEF DOWN");
+        if (cha > 0 && wil > 0 && mag > 0 && sta > 0 && agi > 0 && dex > 0 && str > 0)
+            newList.Add("ALL UP");
+        else if (cha < 0 && wil < 0 && mag < 0 && sta < 0 && agi < 0 && dex < 0 && str < 0)
+            newList.Add("ALL DOWN");
+        else
+        {
+            if (cha != 0)
+                newList.Add("CHA " + cha.ToString("+0;-#"));
+            if (wil != 0)
+                newList.Add("WIL " + wil.ToString("+0;-#"));
+            if (mag != 0)
+                newList.Add("MAG " + mag.ToString("+0;-#"));
+            if (sta != 0)
+                newList.Add("STA " + sta.ToString("+0;-#"));
+            if (agi != 0)
+                newList.Add("AGI " + agi.ToString("+0;-#"));
+            if (dex != 0)
+                newList.Add("DEX " + dex.ToString("+0;-#"));
+            if (str != 0)
+                newList.Add("STR " + str.ToString("+0;-#"));
+        }
+        if (newList.Count > 1 && newList[0].Length < 2)
+            newList.RemoveAt(0);
+        __result = newList.ToArray();
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleMenu.BattleMenuInfo), "Update")]
+public static class ParamStatusDisplay2
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_6).opcode)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)127);
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(SeadCategoryGUIController), "OnGUI")]
 public static class GUIButtons
 {
