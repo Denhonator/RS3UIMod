@@ -762,7 +762,8 @@ public static class FPSFixInterpolateSS
     static void Postfix(SSObject.Anime __instance)
     {
         bool interpolateThis = Settings.instance.interpolate && !Excluded(__instance.m_ssobj.m_fname);
-        bool inMemory = vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) && interpolateThis;
+        bool inMemory = interpolateThis && vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) 
+                     && vtx_arrays[__instance.m_ssobj.m_fname].Length == __instance.m_ssobj.m_vtx_array.Length * 2;
         float threshold = __instance.m_ssobj.m_fname.Contains("souryuha") ? 50f 
                         : __instance.m_ssobj.m_fname.Contains("monster") ? 5f : 10f;
 
@@ -1091,7 +1092,7 @@ public static class FPSFixResonance
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "exec_cmd")]
 public static class FPSFixExecCmd
 {
-    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc",
+    static string[] halfSpeedFunc = { "twinspikemovecalc", "dmgskullcrash", "jinryuumaicalc", "jinryuumaionecalc", "kyuuketupcmodorucalc",
         "mikiri", "tgtmikiri", "firecrackercalc", "monswinddartcalc", "pcwinddartcalc", "tgt_dmg_calc", "arrowstormcalc", "mightycyclonecalc"};
     public static bool Prefix(ref string cmds, ref string cmds_arg, BattleEffect __instance, ref bool __result, ref int ___frame_cnt)
     {

@@ -12,3 +12,5 @@ This fusion spell deals damage to all enemies. Place casters in the Genbu Stance
 [Attack/Near/All Foes] Attack with your bow to blind the enemy.
 [Attack/Long/Single Foe] Attack and charm the enemy with an ultrasonic shot.
 [Attack/Near/All Foes] Attack and charm enemies with an ultrasonic shot.
+[Debuff/Near/Single Foe] Charm the enemy.
+[Debuff/Near/All Foes] Charm the enemy.
