@@ -319,12 +319,29 @@ public static class FPSFixZoom
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_forcedMovement")]
+public static class FPSFixMapCursorAnim
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 60)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)120);
+            else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4).opcode && (Single)code.operand == 30f)
+                yield return new HarmonyLib.CodeInstruction(OpCodes.Ldc_R4, 60f);
+            else
+                yield return code;
+        }
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "Process1Step")]
 public static class FPSFixTest
 {
     static bool Exclude(string s)
     {
-        return s.Contains("zoomObj") || s.Contains("Select");
+        return s.Contains("zoomObj") || s.Contains("Select") || s.Contains("forcedMovement");
     }
     public static bool Prefix(ScriptDrive __instance, ref bool __result, ref string[,] ___r3script, ref int ___currentIndex, ref int ___programCounter)
     {
@@ -606,6 +623,13 @@ public static class FPSFixCmdData
             if (array[i].Contains("bunshinavamv:5_50")) //Doppelslasher
             {
                 array[i] = array[i].Replace(",,,avamv", ",,,,avamv");
+                array4 = array[i].Replace(",", ",,").Split(',');
+            }
+            else if (array[i].Contains("bunshinavamv:1_56_23_67_deadly"))
+            {
+                array[i] = array[i].Replace("/avamv", ",avamv");
+                array[i] = array[i].Replace("/mv:me", ",mv:me");
+                array[i] = array[i].Replace("poi2_82", "poi2_70");
                 array4 = array[i].Replace(",", ",,").Split(',');
             }
             else
@@ -1141,6 +1165,12 @@ public static class FPSFixExecCmd
                     {
                         split[1] = split[1].Replace("22.5", "11.25");
                         split[2] = split[2].Replace("90", "45");
+                        if (cmds_arg.Contains("deadly"))
+                            frames = (frames+1)/4;
+                    }
+                    else if (cmds == "bunshinavamv")
+                    {
+                        split[2] = ((float.Parse(split[2])+1) / 2).ToString();
                     }
                     if (frameIndex == 1 && split.Length > 2 && split[0][0] >= '0' && split[0][0] <= '9' && !cmds.Contains("ava") && !cmds.Contains("contieff"))
                         split[0] = (int.Parse(split[0]) * 2).ToString();
