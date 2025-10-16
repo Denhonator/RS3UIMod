@@ -106,6 +106,7 @@ public static class TrackGameStateChanges
 
             SetGameSpeedByState(s);
         }
+        RS3UI.speedupDisplay = 1000 * Application.targetFrameRate / 60 + Application.targetFrameRate * 2;
     }
 
     public static GameCore.State prevState;
@@ -783,6 +784,11 @@ public static class FPSFixInterpolateSS
         return false;
     }
 
+    public static bool UVAnim(string s)
+    {
+        return s.Contains("squall") || s.Contains("dmg_180_bg_anime") || s.Contains("dmg_187_shourinouta");
+    }
+
     static void Postfix(SSObject.Anime __instance)
     {
         bool interpolateThis = Settings.instance.interpolate && !Excluded(__instance.m_ssobj.m_fname);
@@ -840,10 +846,20 @@ public static class FPSFixInterpolateSS
                     {
                         Dictionary<int, int> polyMap = new Dictionary<int, int>();
                         Dictionary<int, int> rpolyMap = new Dictionary<int, int>();
+                        bool uvInterpolate = false;
+                        if (__instance.m_frames[i].m_meshes.Length == __instance.m_frames[i2].m_meshes.Length && 
+                            Vector3.Distance(__instance.m_ssobj.m_vtx_array[__instance.m_frames[i].m_meshes[k].m_vtx[0]], __instance.m_ssobj.m_vtx_array[__instance.m_frames[i2].m_meshes[k].m_vtx[0]]) < 10f
+                            && UVAnim(__instance.m_name))
+                        {
+                            nextMesh = k;
+                            uvInterpolate = true;
+                        }
+
                         for (int k2 = 0; k2 < __instance.m_frames[i2].m_meshes.Length && nextMesh < 0; k2++)
                         {
                             if (__instance.m_ssobj.m_mtl[__instance.m_frames[i].m_meshes[k].m_mtl_id].mainTexture.name != __instance.m_ssobj.m_mtl[__instance.m_frames[i2].m_meshes[k2].m_mtl_id].mainTexture.name)
                                 continue;
+
                             polyMap.Clear();
                             rpolyMap.Clear();
                             for (int v = 0; v < __instance.m_frames[i].m_meshes[k].m_vtx.Length; v+=4)
@@ -880,16 +896,19 @@ public static class FPSFixInterpolateSS
                         }
                         for (int v = 0; v < newFrames[i * 2 + j].m_meshes[k].m_vtx.Length; v++)
                         {
-                            if (nextMesh >= 0 && newi < __instance.m_ssobj.m_nvtx && polyMap.ContainsKey(v / 4 * 4))
+                            if (nextMesh >= 0 && newi < __instance.m_ssobj.m_nvtx && (uvInterpolate || polyMap.ContainsKey(v / 4 * 4)))
                             {
                                 int newIndex = newi;
                                 int oldIndex = __instance.m_frames[i].m_meshes[k].m_vtx[v];
-                                int nextIndex = __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[polyMap[v / 4 * 4] + v % 4];
+                                int nextIndex = uvInterpolate ? __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[v] : __instance.m_frames[i2].m_meshes[nextMesh].m_vtx[polyMap[v / 4 * 4] + v % 4];
                                 Vector3 interpolated = Vector3.Lerp(__instance.m_ssobj.m_vtx_array[oldIndex], __instance.m_ssobj.m_vtx_array[nextIndex], 0.5f);
 
                                 newFrames[i * 2 + j].m_meshes[k].m_vtx[v] = newIndex;
                                 __instance.m_ssobj.m_vtx_array[newIndex] = interpolated;
-                                __instance.m_ssobj.m_uv_array[newIndex] = __instance.m_ssobj.m_uv_array[oldIndex];
+                                if (uvInterpolate)
+                                    __instance.m_ssobj.m_uv_array[newIndex] = Vector2.Lerp(__instance.m_ssobj.m_uv_array[oldIndex], __instance.m_ssobj.m_uv_array[nextIndex], 0.5f);
+                                else
+                                    __instance.m_ssobj.m_uv_array[newIndex] = __instance.m_ssobj.m_uv_array[oldIndex];
                                 if (__instance.m_ssobj.m_color_array != null)
                                     __instance.m_ssobj.m_color_array[newIndex] = __instance.m_ssobj.m_color_array[oldIndex];
                                 newi++;
@@ -1103,6 +1122,34 @@ public static class FPSFixResonance
         }
     }
 }
+
+//[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "cmd_mightycyclone")]
+//public static class FPSFixMightyCyclone
+//{
+//    static HashSet<int> ignore = new HashSet<int> { 0, 4, 19, 20, 22, 58, 62, 71, 85, 86};
+//    //static HashSet<sbyte> multiply = new HashSet<sbyte> { 18, 20, 22, 24, 40, 52, 58, 86};
+//    //static HashSet<sbyte> multiplyP = new HashSet<sbyte> { 19, 57, 85};
+//    static void Postfix(ref int ___mightycyclone_frame_count)
+//    {
+//        if (Application.targetFrameRate > 30 && !ignore.Contains(___mightycyclone_frame_count) && Time.frameCount % 2 == 0)
+//            ___mightycyclone_frame_count--;
+//    }
+//    //static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+//    //{
+//    //    foreach (var code in instructions)
+//    //    {
+//    //        HarmonyLib.CodeInstruction newCode;
+//    //        if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && multiplyP.Contains((sbyte)code.operand))
+//    //            newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)code.operand * 2 + 1);
+//    //        else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && multiply.Contains((sbyte)code.operand))
+//    //            newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)code.operand * 2);
+//    //        else
+//    //            newCode = code;
+//    //        newCode.labels = code.labels;
+//    //        yield return newCode;
+//    //    }
+//    //}
+//}
 
 //[HarmonyLib.HarmonyPatch(typeof(BattleWork), "info_reset")]
 //public static class SparkRate
