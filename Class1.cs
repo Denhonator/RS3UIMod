@@ -1183,7 +1183,7 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if (cmds.Contains("tex") && !cmds.Contains("calc"))
+        if (cmds.Contains("tex") && !cmds.Contains("calc") && cmds_arg.Contains('_'))
         {
             string[] split = cmds_arg.Split('_');
             for(int i = 0; i < split.Length; i++)
@@ -1192,8 +1192,10 @@ public static class FPSFixExecCmd
                     split[i] = (int.Parse(split[i]) * 2).ToString();
             }
             cmds_arg = string.Join("_", split);
+            if (RS3UI.prints > 0)
+                Msg("Modified " + cmds + " to " + cmds_arg);
         }
-        if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds.Contains("contieff") || cmds=="waitframe" || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="camshake" || cmds=="mulava" || cmds=="ava" || cmds== "avaelbun") 
+        else if ((cmds.Contains("mv") || cmds.Contains("moncolor") || cmds.Contains("contieff") || cmds=="waitframe" || cmds=="monscl" || cmds == "monscl2" || cmds == "monscl6" || cmds=="pal" || cmds.Contains("mulpal") || cmds=="dmgpal" || cmds=="wd" || cmds=="giant" || cmds=="forcesetframe" || cmds=="tex" || cmds=="quake" || cmds=="camshake" || cmds=="mulava" || cmds=="ava" || cmds== "avaelbun") 
             && !cmds.Contains("calc") && !cmds.Contains("gensoku") && !cmds.Contains('_') && cmds!="randommv" && cmds_arg!=null && cmds_arg.Length>0 && cmds_arg[0]!=' ')
         {
             string[] split = cmds_arg.Split('_');
@@ -3752,6 +3754,15 @@ public static class TextReplace3
         {
             __result = RS3UI.replacements[__result];
         }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleResetWindow), "DrawFixedFormatMessage")]
+public static class BattleResetWindowFix
+{
+    public static void Prefix(ref string[] ___descEnglish)
+    {
+        ___descEnglish[1] = "You will lose any unsaved";
     }
 }
 
