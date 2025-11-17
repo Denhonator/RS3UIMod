@@ -792,7 +792,7 @@ public static class FPSFixInterpolateSS
     static void Postfix(SSObject.Anime __instance)
     {
         bool interpolateThis = Settings.instance.interpolate && !Excluded(__instance.m_ssobj.m_fname);
-        bool inMemory = interpolateThis && vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) 
+        bool inMemory = interpolateThis && vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname)
                      && vtx_arrays[__instance.m_ssobj.m_fname].Length == __instance.m_ssobj.m_vtx_array.Length * 2;
         float threshold = __instance.m_ssobj.m_fname.Contains("souryuha") ? 50f 
                         : __instance.m_ssobj.m_fname.Contains("monster") ? 5f : 10f;
@@ -928,7 +928,7 @@ public static class FPSFixInterpolateSS
         if (RS3UI.prints > 0)
             Msg(__instance.m_name);
 
-        if (interpolateThis && !vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) && __instance.m_ssobj.m_fname.Contains("effect"))
+        if (interpolateThis && !vtx_arrays.ContainsKey(__instance.m_ssobj.m_fname) && (__instance.m_ssobj.m_fname.Contains("effect/wpn") || __instance.m_ssobj.m_fname.Contains("effect/dmg")))
         {
             vtx_arrays[__instance.m_ssobj.m_fname] = __instance.m_ssobj.m_vtx_array;
             uv_arrays[__instance.m_ssobj.m_fname] = __instance.m_ssobj.m_uv_array;
