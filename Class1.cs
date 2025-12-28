@@ -55,6 +55,7 @@ public class Settings
     public bool displayParam = true;
     public bool detailedParam = true;
     public bool mapAnywhere = false;
+    public bool pixelFont = true;
     //public bool disableAnim = false;
 }
 
@@ -2547,7 +2548,7 @@ public static class DoubleInputFix
 [HarmonyLib.HarmonyPatch(typeof(MessageWindow), "ResettingMessSpeed")]
 public static class MessageSpeed
 {
-    public static void Postfix(MessageWindow __instance)
+    public static void Postfix(ref MessageWindow __instance)
     {
         __instance.message_speed = Application.targetFrameRate > 30 ? 1 : 2;
     }
@@ -2970,6 +2971,7 @@ public static class CompactDialog
     public static void Postfix(ref MessageWindow __instance)
     {
         HarmonyLib.Traverse.Create(__instance).Field("height1Line").SetValue(30);
+        __instance.message_speed = Application.targetFrameRate > 30 ? 1 : 2;
     }
 }
 
@@ -3021,6 +3023,7 @@ public static class TextBoxHeight2
     {
         __instance.messageWindow[id].lowerMargin = -row * 5;
         __instance.messageWindow[id].upperMargin = 0;
+        __instance.messageWindow[id].message_speed = Application.targetFrameRate > 30 ? 1 : 2;
     }
 }
 
@@ -3207,7 +3210,7 @@ public static class PageNameSizeCommander
         CommanderPageNameWin cmdPageNameWindow = HarmonyLib.Traverse.Create(__instance).Field("cmdPageNameWindow").GetValue<CommanderPageNameWin>();
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(cmdPageNameWindow).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(55, 20);
-        cVariableWindow.SetSize(370, 32);
+        cVariableWindow.SetSize(Settings.instance.pixelFont ? 370 : 400, 32);
     }
 }
 
@@ -3268,8 +3271,8 @@ public static class DisableTextScrollCommand
         HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
         string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
         string line2 = "";
-        GS.m_font_scale_x = 0.65f;
-        GS.m_font_scale_y = 0.65f;
+        GS.m_font_scale_x = Settings.instance.pixelFont ? 0.65f : 0.5f;
+        GS.m_font_scale_y = GS.m_font_scale_x;
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(105, 463);
         cVariableWindow.SetSize(750, 64);
@@ -3317,8 +3320,8 @@ public static class DisableTextScrollCommander
         HarmonyLib.Traverse.Create(__instance).Field("helpScroll").SetValue(0);
         string descText = HarmonyLib.Traverse.Create(__instance).Field("descText").GetValue<string>();
         string line2 = "";
-        GS.m_font_scale_x = 0.65f;
-        GS.m_font_scale_y = 0.65f;
+        GS.m_font_scale_x = Settings.instance.pixelFont ? 0.65f : 0.5f;
+        GS.m_font_scale_y = GS.m_font_scale_x;
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("cVariableWindow").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(105, 463);
         cVariableWindow.SetSize(750, 64);
@@ -3369,8 +3372,8 @@ public static class DisableTextScrollMenu
         __instance.ScrollReset();
         string descText = HarmonyLib.Traverse.Create(__instance).Field("m_Messgae").GetValue<string>();
         string line2 = "";
-        GS.m_font_scale_x = 0.65f;
-        GS.m_font_scale_y = 0.65f;
+        GS.m_font_scale_x = Settings.instance.pixelFont ? 0.65f : 0.5f;
+        GS.m_font_scale_y = GS.m_font_scale_x;
         CVariableWindow cVariableWindow = HarmonyLib.Traverse.Create(__instance).Field("m_Window").GetValue<CVariableWindow>();
         cVariableWindow.SetPos(105, 463);
         cVariableWindow.SetSize(750, 64);
@@ -3418,9 +3421,11 @@ public static class TextPosition
         if (color == Color.white && effect == GS.FontEffect.SHADOW)
             effect = GS.FontEffect.RIM;
         ThickerOutline.thickness = 2;
+        if(!Settings.instance.pixelFont)
+            scale = 0.7f;
         if (RS3UI.windowType.Contains("Command"))
         {
-            scale = 1.0f;
+            scale = Settings.instance.pixelFont ? 1.0f : 0.7f;
 
             if (RS3UI.windowType != "CommandSelect")
                 effect = GS.FontEffect.RIM;
@@ -3439,7 +3444,7 @@ public static class TextPosition
             }
             if (str.Length >= 18 || (GameCore.m_userProfile.language == 0 && str.Length >= 8))
             {
-                scale = GameCore.m_userProfile.language == 0 ? 0.7f : 0.8f;
+                scale = GameCore.m_userProfile.language == 0 ? 0.7f : 0.8f * (Settings.instance.pixelFont ? 1.0f : 0.7f);
                 _y += GameCore.m_userProfile.language == 0 ? 2 : 1;
             }
         }
@@ -3777,7 +3782,7 @@ public static class TextOutline
             ThickerOutline.thickness = RS3UI.windowType.IndexOf('0') >= 0 ? 2 : 4;
         }
 
-        if (GameCore.m_userProfile.language == 0)
+        if (GameCore.m_userProfile.language == 0 && Settings.instance.pixelFont)
         {
             GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
             ThickerOutline.thickness += ThickerOutline.thickness;
@@ -3832,7 +3837,7 @@ public static class FontChange
             Util.Destroy(GS.m_d_font_mtl[(int)type]);
             Util.Destroy(GS.m_d_shadow_mtl[(int)type]);
         }
-        if (File.Exists("rs3font"))
+        if (File.Exists("rs3font") && Settings.instance.pixelFont)
         {
             AssetBundle ab = AssetBundle.LoadFromFile("rs3font");
             foreach (string s in ab.GetAllAssetNames())
@@ -4174,6 +4179,7 @@ public static class GUIButtons
         Settings.instance.interpolate = GUI.Toggle(new Rect(8, 88, 200f, 32f), Settings.instance.interpolate, "Interpolation");
         Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 250f, 32f), Settings.instance.displayParam, "Display buff/debuff upon landing");
         Settings.instance.detailedParam = GUI.Toggle(new Rect(8, 152, 250f, 32f), Settings.instance.detailedParam, "Display buff/debuff between turns");
+        Settings.instance.pixelFont = GUI.Toggle(new Rect(8, 182, 300f, 32f), Settings.instance.pixelFont, "Use old-school pixel font. Restart to take effect");
         //Settings.instance.disableAnim = GUI.Toggle(new Rect(8, 152, 200f, 32f), Settings.instance.disableAnim, "Disable boss anim");
     }
 }
