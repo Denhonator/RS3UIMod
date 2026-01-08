@@ -56,6 +56,7 @@ public class Settings
     public bool detailedParam = true;
     public bool mapAnywhere = false;
     public bool pixelFont = true;
+    public bool finalbossFix = true;
     //public bool disableAnim = false;
 }
 
@@ -4180,9 +4181,39 @@ public static class GUIButtons
         Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 250f, 32f), Settings.instance.displayParam, "Display buff/debuff upon landing");
         Settings.instance.detailedParam = GUI.Toggle(new Rect(8, 152, 250f, 32f), Settings.instance.detailedParam, "Display buff/debuff between turns");
         Settings.instance.pixelFont = GUI.Toggle(new Rect(8, 182, 300f, 32f), Settings.instance.pixelFont, "Use old-school pixel font. Restart to take effect");
+        Settings.instance.finalbossFix = GUI.Toggle(new Rect(8, 212, 300f, 32f), Settings.instance.finalbossFix, "Reduces remaster exclusive hidden HP regen");
         //Settings.instance.disableAnim = GUI.Toggle(new Rect(8, 152, 200f, 32f), Settings.instance.disableAnim, "Disable boss anim");
     }
 }
+
+[HarmonyLib.HarmonyPatch(typeof(BattleLogic.InternalCalc), "last_btl_unknown_heal")]
+public static class UnknownHeal
+{
+    public static void Prefix(ref int ____last_astral_counter, ref int ____last_abyss_counter, bool ____last_boss_climax_flag, ref BattleLogic.BattleUnitManager ____enemy_mng)
+    {
+        Msg("Astral: " + (____last_astral_counter&15) + ", Abyss: " + (____last_abyss_counter&15));
+        if ((____last_astral_counter & 15) > (____last_abyss_counter & 15))
+        {
+            Msg("Oblivion healing for " + ((____last_astral_counter & 15) - (____last_abyss_counter & 15)) * ((____last_boss_climax_flag && !Settings.instance.finalbossFix) ? 1000 : 100));
+            if (Settings.instance.finalbossFix && ____last_boss_climax_flag)
+            {
+                ____enemy_mng[0].hp -= (____last_astral_counter - ____last_abyss_counter) * 90;
+            }
+        }
+    }
+}
+
+//[HarmonyLib.HarmonyPatch(typeof(BattleLogic.InternalCalc), "last_btl_last_boss_change_style")]
+//public static class UnknownHeal2
+//{
+//    public static void Postfix(ref int ____last_astral_counter, ref int ____last_abyss_counter, bool ____last_boss_sp_change_flag, ref BattleLogic.BattleUnitManager ____enemy_mng)
+//    {
+//        if (Settings.instance.finalbossFix && ____last_boss_sp_change_flag && Utility_T_H.Math.is_in(____enemy_mng[0]._player_or_enemy_id, 315, 318))
+//        {
+//            ____last_abyss_counter = ____last_astral_counter; // Makes Wings of Light in Demonic Wings much more feasible
+//        }
+//    }
+//}
 
 namespace RS3
 {
