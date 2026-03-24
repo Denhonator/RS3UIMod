@@ -19,9 +19,9 @@ Included features:
 Let me know if there are bugs or timings of animation being off.
 
 ### Install
-You need to first install MelonLoader for Romancing SaGa 3 https://github.com/LavaGang/MelonLoader  
-Then get the RS3UIMod.zip from the releases page on the right, and extract the ReplaceTexture, rs3font, TextReplacement and Mods into the game folder (or compile the mod yourself with VS 2017)
+Get the RS3UIMod.zip from the releases page on the right, and extract into the game folder (or compile the mod yourself with VS 2017)
 If you want Playstation button icons, also download DS_Buttons.zip and extract to the game folder
+MelonLoader 0.7.0 is included in the latest download (0.7.2 doesn't work), but you can also install it manually from here: https://github.com/LavaGang/MelonLoader
 
 ### How it looks
 <img width="1920" height="1080" alt="rs3mod" src="https://github.com/user-attachments/assets/320d94d4-6b0c-4758-96ef-e4a2e253b64d" />
