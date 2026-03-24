@@ -4181,7 +4181,7 @@ public static class GUIButtons
         Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 250f, 32f), Settings.instance.displayParam, "Display buff/debuff upon landing");
         Settings.instance.detailedParam = GUI.Toggle(new Rect(8, 152, 250f, 32f), Settings.instance.detailedParam, "Display buff/debuff between turns");
         Settings.instance.pixelFont = GUI.Toggle(new Rect(8, 182, 300f, 32f), Settings.instance.pixelFont, "Use old-school pixel font. Restart to take effect");
-        Settings.instance.finalbossFix = GUI.Toggle(new Rect(8, 212, 300f, 32f), Settings.instance.finalbossFix, "Reduces remaster exclusive hidden HP regen");
+        Settings.instance.finalbossFix = GUI.Toggle(new Rect(8, 212, 350f, 32f), Settings.instance.finalbossFix, "Reduces remaster exclusive final boss hidden HP regen");
         //Settings.instance.disableAnim = GUI.Toggle(new Rect(8, 152, 200f, 32f), Settings.instance.disableAnim, "Disable boss anim");
     }
 }
