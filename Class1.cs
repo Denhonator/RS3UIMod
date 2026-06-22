@@ -127,7 +127,7 @@ public static class TrackGameStateChanges
             SetGameSpeedByState(currState);
             if (currState == GameCore.State.OPENNING)
                 GS.FontSize = 28f;
-            else if (prevState == GameCore.State.OPENNING)
+            else if (prevState == GameCore.State.OPENNING || currState == GameCore.State.BATTLE || currState == GameCore.State.FIELD)
                 GS.FontSize = 24f;
         }
     }
@@ -257,9 +257,11 @@ public static class FPSFixDialogBlink
 [HarmonyLib.HarmonyPatch(typeof(MenuFlashText), "Update")]
 public static class FPSFixMenuTextBlink
 {
-    public static void Prefix(ref float ___m_addition, MenuFlashText __instance)
+    public static void Prefix(ref float ___m_addition, ref float ___m_alpha)
     {
         ___m_addition = Mathf.Sign(___m_addition) * Time.deltaTime * 3f;
+        if (Mathf.Abs(___m_alpha + ___m_addition) >= 1.0f)
+            ___m_addition = -___m_addition;
     }
 }
 
@@ -1348,6 +1350,15 @@ public static class FPSFixJulianBlock
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "AppearJumpUndine")]
+public static class FPSFixUndineAppear
+{
+    static void Prefix()
+    {
+
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "RollingJumpCharacter")]
 public static class FPSFixBattleWinJump
 {
@@ -1361,7 +1372,7 @@ public static class FPSFixBattleWinJump
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "Move")]
 public static class FPSFixBattleMove2
 {
-    public static int[] cnt = new int[6];
+    public static int[] cnt = new int[8];
     public static void Prefix(Vector2 s, Vector2 e, ref int frame, float height, int actchar, BattleEffect __instance)
     {
         if (actchar == -1)
@@ -1389,7 +1400,7 @@ public static class FPSFixBattleMove2
 [HarmonyLib.HarmonyPatch(typeof(BattleEffect), "AppearMove")]
 public static class FPSFixBattleMove
 {
-    public static int[] cnt = new int[6];
+    public static int[] cnt = new int[8];
     public static void Prefix(Vector2 s, Vector2 e, ref int frame, float height, int actchar, BattleEffect __instance)
     {
         if (actchar == -1)
@@ -3782,11 +3793,13 @@ public static class TextOutline
             effect |= GS.FontEffect.RIM;
             ThickerOutline.thickness = RS3UI.windowType.IndexOf('0') >= 0 ? 2 : 4;
         }
+        else
+            ThickerOutline.thickness = 2;
 
         if (GameCore.m_userProfile.language == 0 && Settings.instance.pixelFont)
         {
             GS.m_font_mtl[0].mainTexture.filterMode = FilterMode.Point;
-            ThickerOutline.thickness += ThickerOutline.thickness;
+            ThickerOutline.thickness *= 2;
         }
 
         if (RS3UI.windowType == "CommandSelect")
@@ -4191,7 +4204,7 @@ public static class UnknownHeal
 {
     public static void Prefix(ref int ____last_astral_counter, ref int ____last_abyss_counter, bool ____last_boss_climax_flag, ref BattleLogic.BattleUnitManager ____enemy_mng)
     {
-        Msg("Astral: " + (____last_astral_counter&15) + ", Abyss: " + (____last_abyss_counter&15));
+        //Msg("Astral: " + (____last_astral_counter&15) + ", Abyss: " + (____last_abyss_counter&15));
         if ((____last_astral_counter & 15) > (____last_abyss_counter & 15))
         {
             Msg("Oblivion healing for " + ((____last_astral_counter & 15) - (____last_abyss_counter & 15)) * ((____last_boss_climax_flag && !Settings.instance.finalbossFix) ? 1000 : 100));
