@@ -406,6 +406,42 @@ public static class FPSFixPrint
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_move")]
+public static class FPSFixMove1
+{
+    public static void Prefix(int ___npcIndex)
+    {
+        FPSFixMove2.half = true;
+    }
+    public static void Postfix(int ___npcIndex)
+    {
+        FPSFixMove2.half = false;
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(Character), "GetSpeedDot")]
+public static class FPSFixMove2
+{
+    public static bool half = false;
+
+    public static void Postfix(ref int __result)
+    {
+        if (half)
+            __result = (__result > 1 ? __result / 2 : (Time.frameCount % 2 == 0) ? 1 : 0);
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "setVMoveParam")]
+public static class FPSFixJumpSameDir
+{
+    public static void Postfix(ref ActionVM __instance)
+    {
+        __instance.vx *= 0.5f;
+        __instance.gravity *= 0.5f;
+        __instance.totalMoveFrame *= 2;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(GS), "UpdateFade")]
 public static class FPSFixFade
 {
@@ -668,6 +704,25 @@ public static class FPSFixTailSwipe
             else if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand==9)
             {
                 HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)18);
+                newCode.labels = code.labels;
+                yield return newCode;
+            }
+            else
+                yield return code;
+        }
+    }
+}
+
+[HarmonyLib.HarmonyPatch(typeof(BattleEffect), "kokuryu_geki_enemy_move")]
+public static class FPSFixBlackDragon
+{
+    static IEnumerable<HarmonyLib.CodeInstruction> Transpiler(IEnumerable<HarmonyLib.CodeInstruction> instructions)
+    {
+        foreach (var code in instructions)
+        {
+            if (code.opcode == new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S).opcode && (sbyte)code.operand == 26)
+            {
+                HarmonyLib.CodeInstruction newCode = new HarmonyLib.CodeInstruction(OpCodes.Ldc_I4_S, (sbyte)52);
                 newCode.labels = code.labels;
                 yield return newCode;
             }
@@ -2065,10 +2120,19 @@ public static class FPSFixRobinMove
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "a_jumpHere")]
+public static class FPSFixJump
+{
+    public static void Prefix(ref short[] ___s_jump_tbl)
+    {
+        ___s_jump_tbl = FPSFixMovement.m_jump_kidou;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(Field), "CharaUpdate")]
 public static class FPSFixMovement
 {
-    static short[] m_jump_kidou = new short[] { 8, 16, 20, 25, 30, 36, 42, 49, 42, 36, 30, 24, 20, 16, 8, 0 };
+    public static short[] m_jump_kidou = new short[] { 8, 16, 20, 25, 30, 36, 42, 49, 42, 36, 30, 24, 20, 16, 8, 0 };
 
     static bool btst(int a, int b)
     {
@@ -4292,7 +4356,7 @@ namespace RS3
             {
                 TrackGameStateChanges.IncrementCurrentGameStateSpeed();
             }
-            if (Input.GetKey(KeyCode.End))
+            if (Input.GetKey(KeyCode.End) && Input.GetKey(KeyCode.LeftShift))
                 Application.targetFrameRate = 2000;
             else if (Application.targetFrameRate == 2000)
                 TrackGameStateChanges.SetGameSpeedByState(GameCore.m_state);
