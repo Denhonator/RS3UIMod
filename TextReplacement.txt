@@ -14,3 +14,7 @@ This fusion spell deals damage to all enemies. Place casters in the Genbu Stance
 [Attack/Near/All Foes] Attack and charm enemies with an ultrasonic shot.
 [Debuff/Near/Single Foe] Charm the enemy.
 [Debuff/Near/All Foes] Charm the enemy.
+Immune to lightning-based attacks.
+Resistant to lightning-based attacks.
+Immune to fainting.
+Immune to instant death.

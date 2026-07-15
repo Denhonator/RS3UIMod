@@ -51,6 +51,7 @@ public class Settings
     public int fieldSpeed = 0;
     public int otherSpeed = 0;
 
+    public float textSpeed = 1.0f;
     public bool interpolate = true;
     public bool displayParam = true;
     public bool detailedParam = true;
@@ -2630,6 +2631,25 @@ public static class MessageSpeed
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(MessageWindow), "UpdateWindow")]
+public static class MessageSpeed2
+{
+    static int prevSpeed = 1;
+    public static void Prefix(ref MessageWindow __instance)
+    {
+        int add = ((Settings.instance.textSpeed == 1.5f && (Time.frameCount % 2) == 0) || Settings.instance.textSpeed == 2.0f) ? 1 :
+            Settings.instance.textSpeed > 1.5f ? (int)Settings.instance.textSpeed : 0;
+
+        prevSpeed = __instance.message_speed;
+        __instance.message_speed += add;
+    }
+
+    public static void Postfix(ref MessageWindow __instance)
+    {
+        __instance.message_speed = prevSpeed;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(ScriptDrive), "s_endingStatus")]
 public static class EndingStatWindowWidth
 {
@@ -4254,6 +4274,13 @@ public static class GUIButtons
     public static void Postfix()
     {
         //GUI.Label(new Rect(8, 70, 96f, 32f), "");
+        if(GUI.Button(new Rect(128, 78, 200f, 32f), string.Format("Text Speed: {0:F1}", Settings.instance.textSpeed)))
+        {
+            Settings.instance.textSpeed = 
+                Settings.instance.textSpeed < 1.5f ? 1.5f : 
+                Settings.instance.textSpeed < 2.0f ? 2.0f : 
+                Settings.instance.textSpeed < 3.0f ? 3.0f : 1.0f;
+        }
         Settings.instance.interpolate = GUI.Toggle(new Rect(8, 88, 200f, 32f), Settings.instance.interpolate, "Interpolation");
         Settings.instance.displayParam = GUI.Toggle(new Rect(8, 120, 250f, 32f), Settings.instance.displayParam, "Display buff/debuff upon landing");
         Settings.instance.detailedParam = GUI.Toggle(new Rect(8, 152, 250f, 32f), Settings.instance.detailedParam, "Display buff/debuff between turns");
