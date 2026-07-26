@@ -14,7 +14,17 @@ This fusion spell deals damage to all enemies. Place casters in the Genbu Stance
 [Attack/Near/All Foes] Attack and charm enemies with an ultrasonic shot.
 [Debuff/Near/Single Foe] Charm the enemy.
 [Debuff/Near/All Foes] Charm the enemy.
+[Attack/Near/Single Foe] Perform a stellar attack with your sword. Transforms into a greatsword.
+[Attack/Near/Single Foe] Perform a stellar attack with your sword. Transforms into a sword of light.
 Immune to lightning-based attacks.
-Resistant to lightning-based attacks.
+Highly resistant to lightning-based attacks.
 Immune to fainting.
 Immune to instant death.
+Recovers Max HP for a single ally.
+Full recovery for a single ally.
+Faeries' Harp
+Faeries' Herb
+4_151_1
+Immune to poison.\nHighly resistant to heat-based attacks.\nResistant to blunt attacks.
+4_204_1
+Highly resistant to status ailments.

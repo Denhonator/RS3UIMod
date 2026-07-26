@@ -1243,7 +1243,7 @@ public static class FPSFixExecCmd
         }
         if (RS3UI.prints > 0)
             Msg(cmds + " : " + cmds_arg);
-        if (cmds.Contains("tex") && !cmds.Contains("calc") && cmds_arg.Contains('_'))
+        if ((cmds.Contains("tex") && !cmds.Contains("calc") && cmds_arg.Contains('_'))||cmds=="jump_yuki")
         {
             string[] split = cmds_arg.Split('_');
             for(int i = 0; i < split.Length; i++)
@@ -3837,11 +3837,19 @@ public static class TextReplace2
 [HarmonyLib.HarmonyPatch(typeof(MenuListText), "GetText_BtlUse")]
 public static class TextReplace
 {
-    public static void Postfix(ref string __result)
+    public static void Postfix(ref string __result, int sheet, int id, int lang)
     {
         if (RS3UI.replacements.ContainsKey(__result))
         {
             __result = RS3UI.replacements[__result];
+        }
+        else
+        {
+            int i = sheet * 1000 * 1000 + id * 10 + lang;
+            if (RS3UI.assignments.ContainsKey(i))
+            {
+                __result = RS3UI.assignments[i];
+            }
         }
     }
 }
@@ -3849,11 +3857,19 @@ public static class TextReplace
 [HarmonyLib.HarmonyPatch(typeof(MenuListText), "GetText", new Type[] { typeof(int),typeof(int),typeof(int) })]
 public static class TextReplace3
 {
-    public static void Postfix(ref string __result)
+    public static void Postfix(ref string __result, int sheet, int id, int lang)
     {
         if (RS3UI.replacements.ContainsKey(__result))
         {
             __result = RS3UI.replacements[__result];
+        }
+        else
+        {
+            int i = sheet * 1000 * 1000 + id * 10 + lang;
+            if (RS3UI.assignments.ContainsKey(i))
+            {
+                __result = RS3UI.assignments[i];
+            }
         }
     }
 }
@@ -4198,7 +4214,7 @@ public static class ParamStatusDisplay
         if (sta != 0)
             newList.Add("STA " + sta.ToString("+0;-#"));
         if (agi != 0)
-            newList.Add("AGI " + agi.ToString("+0;-#"));
+            newList.Add("SPD " + agi.ToString("+0;-#"));
         if (dex != 0)
             newList.Add("DEX " + dex.ToString("+0;-#"));
         if (str != 0)
@@ -4333,6 +4349,7 @@ namespace RS3
         public static int prints = 0;
         public static int descLineLen = 85;
         public static Dictionary<string, string> replacements = new Dictionary<string, string>();
+        public static Dictionary<int, string> assignments = new Dictionary<int, string>();
         static GameObject gui = null;
 
         public override void OnInitializeMelon()
@@ -4345,9 +4362,18 @@ namespace RS3
                     string[] lines = File.ReadAllLines("TextReplacement.txt");
                     for (int i = 0; i + 1 < lines.Length; i += 2)
                     {
-                        replacements[lines[i]] = lines[i + 1];
+                        if (lines[i].Contains("_"))
+                        {
+                            string[] parts = lines[i].Split('_');
+                            int sheet = int.Parse(parts[0]);
+                            int id = int.Parse(parts[1]);
+                            int lang = int.Parse(parts[2]);
+                            assignments[sheet * 1000 * 1000 + id * 10 + lang] = lines[i + 1].Replace("\\n", "\n");
+                        }
+                        else
+                            replacements[lines[i]] = lines[i + 1];
                     }
-                    Msg("Loaded " + replacements.Keys.Count.ToString() + " replacements from TextReplacement.txt");
+                    Msg("Loaded " + (replacements.Keys.Count+assignments.Keys.Count).ToString() + " replacements from TextReplacement.txt");
                 }
             }
             catch(Exception e)
@@ -4360,6 +4386,18 @@ namespace RS3
         {
             base.OnApplicationQuit();
             Settings.WriteSettings();
+        }
+
+        public override void OnLateInitializeMelon()
+        {
+            base.OnLateInitializeMelon();
+            for(int i = 0; i < GameCore.m_scriptDrive.data.itemName.GetLength(0); i++)
+            {
+                if (replacements.ContainsKey(GameCore.m_scriptDrive.data.itemName[i, 1]))
+                {
+                    GameCore.m_scriptDrive.data.itemName[i, 1] = replacements[GameCore.m_scriptDrive.data.itemName[i, 1]];
+                }
+            }
         }
 
         public override void OnUpdate()
@@ -4397,6 +4435,35 @@ namespace RS3
                 else
                 {
                     GameObject.Destroy(gui);
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.F2))
+            {
+                Directory.CreateDirectory("TextSheets");
+                int[][] ms_MenuMsgListTableJP = HarmonyLib.Traverse.Create(typeof(MenuListText)).Field("ms_MenuMsgListTable").GetValue<int[][][]>()[0];
+                int[][] ms_MenuMsgListTableEN = HarmonyLib.Traverse.Create(typeof(MenuListText)).Field("ms_MenuMsgListTable").GetValue<int[][][]>()[1];
+                byte[] ms_MenuMsgTxtTableJP = HarmonyLib.Traverse.Create(typeof(MenuListText)).Field("ms_MenuMsgTxtTable").GetValue<byte[][]>()[0];
+                byte[] ms_MenuMsgTxtTableEN = HarmonyLib.Traverse.Create(typeof(MenuListText)).Field("ms_MenuMsgTxtTable").GetValue<byte[][]>()[1];
+                for(int i = 0; i < 33; i++)
+                {
+                    StreamWriter sw = File.CreateText("TextSheets/" + i + ".txt");
+                    for(int j=1; j< ms_MenuMsgListTableEN[i].Length; j++)
+                    {
+                        for (int l = 0; l < 2; l++)
+                        {
+                            int[][] array = l == 0 ? ms_MenuMsgListTableJP : ms_MenuMsgListTableEN;
+                            byte[] array2 = l == 0 ? ms_MenuMsgTxtTableJP : ms_MenuMsgTxtTableEN;
+                            int num2 = array[i][j - 1];
+                            int num3 = array[i][j];
+                            byte[] array3 = new byte[num3 - num2];
+                            int num4 = System.Runtime.InteropServices.Marshal.SizeOf(array2.GetType().GetElementType());
+                            Buffer.BlockCopy(array2, num2 * num4, array3, 0, array3.Length * num4);
+                            string @string = System.Text.Encoding.UTF8.GetString(array3);
+
+                            sw.WriteLine(j+": "+@string);
+                        }
+                    }
+                    sw.Close();
                 }
             }
 
