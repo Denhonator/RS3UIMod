@@ -443,6 +443,15 @@ public static class FPSFixJumpSameDir
     }
 }
 
+[HarmonyLib.HarmonyPatch(typeof(ActionVM), "VMove")]
+public static class FPSFixJumpGravity
+{
+    public static void Prefix(ref ActionVM __instance)
+    {
+        __instance.vposy -= (__instance.vy+__instance.gravity)*0.5f;
+    }
+}
+
 [HarmonyLib.HarmonyPatch(typeof(GS), "UpdateFade")]
 public static class FPSFixFade
 {
