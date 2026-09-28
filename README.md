@@ -4,7 +4,7 @@
 
 This mod aims to make the UI and some other features more like the original game and less like a phone game.
 Included features:
-* Font replacement for something sharper and closer to the SFC version.
+* Font replacement for something sharper and closer to the SFC version. Optional. フォントを選択できます。
 * Combat UI arrangement more compact and closer to the SFC version.
 * UI texture replacement using textures similar to the SFC version.
 * Skill etc. descriptions display fully instead of scrolling.
